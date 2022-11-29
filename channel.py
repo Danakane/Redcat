@@ -8,7 +8,7 @@ class Channel(abc.ABC):
     def __init__(self, stopevent: threading.Event) -> None:
         self.__thread: threading.Thread = None
         self.__open: bool = False
-        self.__stopevt: threading.Thread = stopevent
+        self.__stopevt: threading.Event = stopevent
 
     @abstractmethod
     def Send(self, data: bytes) -> None:

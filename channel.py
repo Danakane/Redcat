@@ -9,11 +9,12 @@ class Channel(abc.ABC):
         self.__thread: threading.Thread = None
         self.__open: bool = False
         self.__stopevt: threading.Event = stopevent
+        self.__readyevt: threading.Event = threading.Event()
 
     @property
     def IsOpen(self) -> bool:
         return self.__open
-
+    
     @abstractmethod
     def Send(self, data: bytes) -> None:
         pass
@@ -52,18 +53,26 @@ class Channel(abc.ABC):
         self.__thread.join()
         self.__open = False
 
+    def Error(self) -> None:
+        self.__open = False
+        self.OnError()
+
+    def WaitOpen(self, timeout=None) -> bool:
+        return self.__readyevt.wait(timeout)
+
     def __run(self) -> None:
-        self.__open = True
         if self.ListenOrConnect():
+            self.__open = True
+            self.__readyevt.set()
             self.OnConnectionEstablished()
             while not self.__stopevt.is_set():
                 error, data = self.Recv()
                 if error:
-                    self.OnError()
+                    self.Error()
                     self.__stopevt.set()
                 else:
                     self.Collect(data)
         else:
-            self.OnError()
+            self.Error()
             self.__stopevt.set()
 

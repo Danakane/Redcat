@@ -22,6 +22,7 @@ class TCPChannel(channel.Channel):
         self.__serversock: socket.socket = None
         self.__sock: socket.socket = None
         self.__dataqueue: typing.Queue = queue.Queue()
+        self.__lock = threading.Lock()
  
     def ListenOrConnect(self) -> bool:
         noerror: bool = True
@@ -94,7 +95,8 @@ class TCPChannel(channel.Channel):
 
     def Collect(self, data: bytes) -> None:
         print(data.decode("UTF-8"), end="")
-        self.__dataqueue.put(data)
+        with self.__lock:
+            self.__dataqueue.put(data)
 
     def OnError(self) -> None:
         if self.__error:
@@ -102,7 +104,8 @@ class TCPChannel(channel.Channel):
 
     def Retrieve(self) -> bytes:
         data: bytes = b""
-        if not self.__dataqueue.empty():
-            data = self.__dataqueue.get()
+        with self.__lock:
+            while not self.__dataqueue.empty():
+                data = self.__dataqueue.get()
         return data
 

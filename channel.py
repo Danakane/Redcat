@@ -76,3 +76,10 @@ class Channel(abc.ABC):
             self.Error()
             self.__stopevt.set()
 
+    def __enter__(self):
+        self.Open()
+        return self
+
+    def __exit__(self, type, value, traceback) -> None:
+        self.Close()
+

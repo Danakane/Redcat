@@ -1,33 +1,37 @@
+import sys
 import select
 import socket
-import queue
 import select
 import threading
 import typing
-
+import ipaddress
 
 import channel
 
 
-class TCPChannel(channel.Channel):
+class TcpChannel(channel.Channel):
 
-    def __init__(self, endpoint: tuple, protocol: int, connect: bool, stopevent: threading.Event) -> None:
+    def __init__(self, addr: str, port: int, mode: int, stopevent: threading.Event) -> None:
         super().__init__(stopevent)
-        self.__endpoint: typing.Tuple = endpoint
+        self.__endpoint: typing.Tuple[typing.Any] = None
+        self.__protocol: int = socket.AF_INET
+        if self.__valid_ip_address(addr) == socket.AF_INET:
+            self.__endpoint = (addr, port)
+            self.__protocol = socket.AF_INET
+        else:
+            self.__endpoint = (addr, port, 0, 0)
+            self.__protocol = socket.AF_INET6
         self.__remote: typing.Tuple = ()
-        self.__connect: bool = connect
-        self.__protocol: int = protocol
+        self.__mode: int = mode
         self.__listenning: bool = False
         self.__error: str = ""
         self.__serversock: socket.socket = None
         self.__sock: socket.socket = None
-        self.__dataqueue: typing.Queue = queue.Queue()
-        self.__lock = threading.Lock()
- 
-    def ListenOrConnect(self) -> bool:
-        noerror: bool = True
+         
+    def listen_or_connect(self) -> bool:
+        res: bool = True
         try:
-            if self.__connect:
+            if self.__mode == channel.Channel.CONNECT:
                 self.__sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
                 self.__sock.connect(self.__endpoint)
                 self.__remote = self.__endpoint
@@ -39,14 +43,14 @@ class TCPChannel(channel.Channel):
                 self.__serversock.listen(1)
                 self.__sock, self.__remote = self.__serversock.accept()
         except Exception as err:
-            noerror = False
+            res = False
             self.__error = err.args[1]
             pass
         finally:
             self.__listenning = False
-        return noerror
+        return res
 
-    def OnClose(self) -> None:
+    def on_close(self) -> None:
         if self.__sock:
             try:
                 self.__sock.shutdown(socket.SHUT_RDWR)
@@ -70,15 +74,15 @@ class TCPChannel(channel.Channel):
             except:
                 pass
 
-    def OnConnectionEstablished(self) -> None:
-        if self.IsOpen:
-            print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}")
+    def on_connection_established(self) -> None:
+        if self.is_open:
+            print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}") 
 
-    def Recv(self) -> typing.Tuple[bool, bytes]:
+    def recv(self) -> typing.Tuple[bool, bytes]:
         error = False
         data = b""
         try:
-            readables, _, _= select.select([self.__sock], [], [], 0.2)
+            readables, _, _= select.select([self.__sock], [], [], 0.05)
             if readables and readables[0] == self.__sock:
                 try:
                     data = self.__sock.recv(4096)
@@ -90,22 +94,20 @@ class TCPChannel(channel.Channel):
             self.__error = err.args[1]
         return error, data
 
-    def Send(self, data: bytes) -> None:
+    def send(self, data: bytes) -> None:
         self.__sock.send(data)
 
-    def Collect(self, data: bytes) -> None:
-        print(data.decode("UTF-8"), end="")
-        with self.__lock:
-            self.__dataqueue.put(data)
-
-    def OnError(self) -> None:
+    def on_error(self) -> None:
         if self.__error:
             print(self.__error)
 
-    def Retrieve(self) -> bytes:
-        data: bytes = b""
-        with self.__lock:
-            while not self.__dataqueue.empty():
-                data = self.__dataqueue.get()
-        return data
+    def __valid_ip_address(self, addr: str) -> int:
+        res: int = socket.AF_INET
+        try:
+            if type(ipaddress.ip_address(addr)) is ipaddress.IPv6Address:
+                res = socket.AF_INET6
+        except ValueError:
+            pass
+        return res
 
+    

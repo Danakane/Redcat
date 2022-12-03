@@ -69,8 +69,8 @@ class Platform:
                         break
                 if got_pty:
                     break
-        time.sleep(0.5)
         self.__chan.wait_data()
+        time.sleep(0.1)
         self.__chan.purge()
         return got_pty
 

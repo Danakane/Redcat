@@ -106,7 +106,8 @@ class Channel(abc.ABC):
                     self.error()
                     self.__stop_evt.set()
                 else:
-                    self.collect(data)
+                    if data:
+                        self.collect(data)
         else:
             self.error()
             self.__stop_evt.set()

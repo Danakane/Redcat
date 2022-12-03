@@ -3,6 +3,7 @@ import sys
 import socket
 import termios
 import threading
+import time
 import tty
 
 import channel
@@ -59,10 +60,15 @@ class Session:
 
     def __run(self):
         self.__running = True
+        self.__chan.wait_data()
+        time.sleep(0.1)
+        self.__chan.purge()
+        self.__chan.send(b"\n")
         while not self.__stop_evt.is_set():
             data = self.__chan.retrieve()
             if data:
                 print(data.decode("UTF-8"), end="")
+                data = b""
             sys.stdout.flush()
 
     def __enter__(self):

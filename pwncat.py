@@ -26,15 +26,15 @@ if __name__ == "__main__":
     port = args.port[0]
 
     with session.Session(addr, port, mode=mode) as sess:
-        if sess.wait_open():
-            sess.interactive(True)
-            sess.start()
-            try:
+        try:
+            if sess.wait_open():
+                sess.interactive(True)
+                sess.start()
                 while sess.is_open:
                     byte = sys.stdin.buffer.read(1) 
                     if sess.is_open:
                         sess.send(byte)
-            except KeyboardInterrupt:
-                pass
-            except Exception:
-                pass
+        except KeyboardInterrupt:
+            pass
+        except Exception:
+            pass

@@ -30,6 +30,7 @@ class TcpChannel(channel.Channel):
          
     def listen_or_connect(self) -> bool:
         res: bool = True
+        try:
             if self.__mode == channel.Channel.CONNECT:
                 self.__sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
                 self.__sock.connect(self.__endpoint)

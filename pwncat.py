@@ -30,10 +30,7 @@ if __name__ == "__main__":
             if sess.wait_open():
                 sess.interactive(True)
                 sess.start()
-                while sess.is_open:
-                    byte = sys.stdin.buffer.read(1) 
-                    if sess.is_open:
-                        sess.send(byte)
+                sess.wait_stop()
         except KeyboardInterrupt:
             pass
         except Exception:

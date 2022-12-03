@@ -22,7 +22,8 @@ class Session:
         if self.__chan:
             self.__platform = platform.Platform(self.__chan, platform_name)
         self.__interactive: bool = False
-        self.__thread: threading.Thread = None
+        self.__thread_reader: threading.Thread = None
+        self.__thread_writer: threading.Thread = None
         self.__stop_evt: threading.Event = threading.Event()
         self.__running: bool = False
 
@@ -36,6 +37,8 @@ class Session:
     def close(self) -> None:
         self.__chan.close()
         self.__interactive = self.__platform.interactive(False)
+        self.__thread_reader.join()
+        self.__thread_writer.join()
 
     def interactive(self, value: bool) -> bool:
         if (not self.__interactive) and self.__platform:
@@ -44,21 +47,27 @@ class Session:
 
     def start(self) -> None:
         self.__stop_evt.clear()
-        self.__thread = threading.Thread(target=self.__run)
-        self.__thread.start()
+        self.__thread_reader = threading.Thread(target=self.__run_reader)
+        self.__thread_writer = threading.Thread(target=self.__run_writer)
+        self.__thread_reader.start()
+        self.__thread_writer.start()
 
     def stop(self) -> None:
         self.__stop_evt.set()
-        self.__thread.join()
+        self.__thread_reader.join()
+        self.__thread_writer.join()
         self.__running = False
 
     def send(self, data: bytes) -> None:
         self.__chan.send(data)
 
-    def wait_open(self) -> bool:
-        return self.__chan.wait_open()
+    def wait_open(self, timeout: int=None) -> bool:
+        return self.__chan.wait_open(timeout)
 
-    def __run(self):
+    def wait_stop(self, timeout: int=None) -> None:
+        return self.__stop_evt.wait(timeout)
+
+    def __run_reader(self)-> None:
         self.__running = True
         self.__chan.wait_data()
         time.sleep(0.1)
@@ -70,6 +79,22 @@ class Session:
                 print(data.decode("UTF-8"), end="")
                 data = b""
             sys.stdout.flush()
+        if self.__chan.is_open:
+            self.__chan.close()
+
+    def __run_writer(self) -> None:
+        self.__running = True
+        while not self.__stop_evt.is_set():
+            byte = sys.stdin.buffer.read(1)
+            if byte:
+                try:
+                    self.send(byte)
+                except socket.error as e:
+                    self.__stop_evt.set()
+                except IOError as e:
+                    self.__stop_evt.set()
+        if self.__chan.is_open:
+            self.__chan.close()
 
     def __enter__(self):
         self.open()

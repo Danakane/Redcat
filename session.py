@@ -79,21 +79,22 @@ class Session:
                 print(data.decode("UTF-8"), end="")
                 data = b""
             sys.stdout.flush()
-        if self.__chan.is_open:
-            self.__chan.close()
 
     def __run_writer(self) -> None:
         self.__running = True
+        error = False
         while not self.__stop_evt.is_set():
             byte = sys.stdin.buffer.read(1)
             if byte:
                 try:
                     self.send(byte)
-                except socket.error as e:
+                except socket.error:
                     self.__stop_evt.set()
-                except IOError as e:
+                    error = True
+                except IOError:
                     self.__stop_evt.set()
-        if self.__chan.is_open:
+                    error = True
+        if error and self.__chan.is_open:
             self.__chan.close()
 
     def __enter__(self):

@@ -27,7 +27,7 @@ class Platform:
         if self.__platform_name == Platform.LINUX:
             self.__chan.purge()
             self.__chan.send(f"which {name}\n".encode())
-            self.__chan.wait_data()
+            self.__chan.wait_data(2)
             res = self.__chan.retrieve()
         return res.decode("UTF-8")
 

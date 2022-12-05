@@ -54,8 +54,10 @@ class Session:
 
     def stop(self) -> None:
         self.__stop_evt.set()
-        self.__thread_reader.join()
-        self.__thread_writer.join()
+        if self.__thread_reader:
+            self.__thread_reader.join()
+        if self.__thread_writer:
+            self.__thread_writer.join()
         self.__running = False
 
     def send(self, data: bytes) -> None:

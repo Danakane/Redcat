@@ -69,9 +69,9 @@ class Platform:
                         break
                 if got_pty:
                     break
-        self.__chan.wait_data()
-        time.sleep(0.1)
-        self.__chan.purge()
+            self.__chan.wait_data()
+            time.sleep(0.1)
+            self.__chan.purge()
         return got_pty
 
     def interactive(self, value: bool):

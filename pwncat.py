@@ -38,5 +38,5 @@ if __name__ == "__main__":
                 sess.wait_stop()
         except KeyboardInterrupt:
             pass
-        except Exception:
-            pass
+        #except Exception:
+            #pass

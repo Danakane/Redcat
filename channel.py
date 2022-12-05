@@ -1,3 +1,4 @@
+import enum
 import queue
 import sys
 import threading
@@ -5,16 +6,24 @@ import typing
 import abc
 from abc import abstractmethod
 
+class ChannelState(enum.Enum):
+    ERROR = -1
+    CLOSED = 0
+    OPEN = 1
+    OPENNING = 2
+    CLOSING = 3
+
+
+
 class Channel(abc.ABC):
 
     TCP: int = 0
 
     BIND: int = 0
     CONNECT: int = 1
-
     def __init__(self, stop_evt: threading.Event) -> None:
         self.__thread: threading.Thread = None
-        self.__open: bool = False
+        self.__state: int = ChannelState.CLOSED
         self.__stop_evt: threading.Event = stop_evt
         self.__ready_evt: threading.Event = threading.Event()
         self.__has_data_evt: threading.Event() = threading.Event()
@@ -24,7 +33,23 @@ class Channel(abc.ABC):
 
     @property
     def is_open(self) -> bool:
-        return self.__open
+        return self.__state == ChannelState.OPEN
+
+    @property
+    def is_openning(self) -> bool:
+        return self.__state == ChannelState.OPENNING
+
+    @property
+    def is_closed(self) -> bool:
+        return self.__state == ChannelState.CLOSED
+
+    @property
+    def is_closing(self) -> bool:
+        return self.__state == ChannelState.CLOSING
+
+    @property
+    def state(self) -> int:
+        return self.__state
     
     @abstractmethod
     def send(self, data: bytes) -> None:
@@ -51,17 +76,19 @@ class Channel(abc.ABC):
         pass
 
     def open(self) -> None:
+        self.__state = ChannelState.OPENNING
         self.__thread = threading.Thread(target=self.__run)
         self.__thread.start()
 
     def close(self) -> None:
+        self.__state = ChannelState.CLOSING
         self.__stop_evt.set()
         self.on_close()
         self.__thread.join()
-        self.__open = False
+        self.__state = ChannelState.CLOSED
 
     def error(self) -> None:
-        self.__open = False
+        self.__state = ChannelState.ERROR
         self.on_error()
 
     def collect(self, data: bytes) -> None:
@@ -97,17 +124,20 @@ class Channel(abc.ABC):
 
     def __run(self) -> None:
         if self.listen_or_connect():
-            self.__open = True
-            self.__ready_evt.set()
-            self.on_connection_established()
-            while not self.__stop_evt.is_set():
-                error, data = self.recv()
-                if error:
-                    self.error()
-                    self.__stop_evt.set()
-                else:
-                    if data:
-                        self.collect(data)
+            if self.__state == ChannelState.OPENNING:
+                self.__state = ChannelState.OPEN
+                self.__ready_evt.set()
+                self.on_connection_established()
+                while not self.__stop_evt.is_set():
+                    error, data = self.recv()
+                    if error:
+                        self.error()
+                        self.__stop_evt.set()
+                    else:
+                        if data:
+                            self.collect(data)
+            else:
+                self.__stop_evt.set()
         else:
             self.error()
             self.__stop_evt.set()

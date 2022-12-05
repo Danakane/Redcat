@@ -37,8 +37,10 @@ class Session:
     def close(self) -> None:
         self.__chan.close()
         self.__interactive = self.__platform.interactive(False)
-        self.__thread_reader.join()
-        self.__thread_writer.join()
+        if self.__thread_reader:
+            self.__thread_reader.join()
+        if self.__thread_writer:
+            self.__thread_writer.join()
 
     def interactive(self, value: bool) -> bool:
         if (not self.__interactive) and self.__platform:

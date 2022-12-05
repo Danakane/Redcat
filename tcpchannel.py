@@ -42,10 +42,11 @@ class TcpChannel(channel.Channel):
                 self.__serversock.bind(self.__endpoint)
                 self.__serversock.listen(1)
                 self.__sock, self.__remote = self.__serversock.accept()
+        except OSError:
+            res = False
         except Exception as err:
             res = False
             self.__error = err.args[1]
-            pass
         finally:
             self.__listenning = False
         return res

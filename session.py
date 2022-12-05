@@ -73,10 +73,6 @@ class Session:
 
     def __run_reader(self)-> None:
         self.__running = True
-        self.__chan.wait_data()
-        time.sleep(0.5)
-        self.__chan.purge()
-        self.__chan.send(b"\n")
         while not self.__stop_evt.is_set():
             data = self.__chan.retrieve()
             if data:

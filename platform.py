@@ -91,8 +91,10 @@ class Platform:
                     + "\n"
                 )
                 self.__chan.send(payload.encode())
-                self.__chan.wait_data()
+                self.__chan.wait_data(2)
+                time.sleep(0.5)
                 self.__chan.purge()
+                self.__chan.send(b"\n")
             else:
                 termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
         else:

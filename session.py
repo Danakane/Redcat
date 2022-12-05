@@ -3,7 +3,6 @@ import sys
 import socket
 import termios
 import threading
-import time
 import tty
 
 import channel

@@ -5,7 +5,6 @@ import socket
 import sys
 import termios
 import threading
-import time
 import tty
 import argparse
 

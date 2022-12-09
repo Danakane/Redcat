@@ -1,11 +1,5 @@
 #!/usr/bin/python
 
-import os
-import socket
-import sys
-import termios
-import threading
-import tty
 import argparse
 
 import channel
@@ -36,6 +30,4 @@ if __name__ == "__main__":
                 sess.start()
                 sess.wait_stop()
         except KeyboardInterrupt:
-            pass
-        except Exception:
             pass

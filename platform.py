@@ -26,11 +26,9 @@ class Platform(abc.ABC):
     def channel(self) -> channel.Channel:
         return self.__chan
 
-    def get_pty(self) -> bool:
-        return False
-
+    @abstractmethod
     def interactive(self, value: bool) -> bool:
-        return False
+        pass
 
 
 class Linux(Platform):
@@ -116,10 +114,14 @@ class Linux(Platform):
             termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
         return res
 
+
 class Windows(Platform):
 
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, Platform.WINDOWS)
+
+    def interactive(self, value: bool) -> bool:
+        return True
 
 
 def get_platform(chan: channel.Channel, platform_name: str) -> Platform:
@@ -129,3 +131,4 @@ def get_platform(chan: channel.Channel, platform_name: str) -> Platform:
     elif platform_name.lower() == Platform.WINDOWS:
         platform = Windows(chan)
     return platform
+

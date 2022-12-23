@@ -19,7 +19,7 @@ class Session:
         if channel_protocol == channel.Channel.TCP:
             self.__chan = tcpchannel.TcpChannel(addr, port, mode, threading.Event())
         if self.__chan:
-            self.__platform = platform.Platform(self.__chan, platform_name)
+            self.__platform = platform.get_platform(self.__chan, platform_name)
         self.__interactive: bool = False
         self.__thread_reader: threading.Thread = None
         self.__thread_writer: threading.Thread = None
@@ -43,7 +43,7 @@ class Session:
 
     def interactive(self, value: bool) -> bool:
         if (not self.__interactive) and self.__platform:
-            self.__interactive = self.__platform.interactive(value)
+            self.__interactive = self.__platform.interactive(True)
         return self.__interactive
 
     def start(self) -> None:

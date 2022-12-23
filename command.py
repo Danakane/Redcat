@@ -1,9 +1,8 @@
 import copy
 import typing
 import shlex
-import os
 import subprocess
-
+import os
 
 class Argument:
 
@@ -192,14 +191,14 @@ class Engine:
         return res
 
     def __callsystem(self, cmd_line: str) -> None:
-        subprocess.run(cmd_line, shell=True)
+        subprocess.run(cmd_line, shell=True, executable=os.environ["SHELL"])
 
     def __exit(self) -> bool:
         self.__running = False
         return True
 
     def __clear(self) -> bool:     
-        os.system("clear")
+        subprocess.run("clear", executable=os.environ["SHELL"])
         return True
 
     # -------------------------------------------------------------------------------------------#

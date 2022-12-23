@@ -121,7 +121,7 @@ class Windows(Platform):
         super().__init__(chan, Platform.WINDOWS)
 
     def interactive(self, value: bool) -> bool:
-        return True
+        return value
 
 
 def get_platform(chan: channel.Channel, platform_name: str) -> Platform:

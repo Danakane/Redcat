@@ -35,6 +35,7 @@ class Session:
 
     def close(self) -> None:
         self.__chan.close()
+        print(end="") # to avoid bad file descriptor error message
         self.__interactive = self.__platform.interactive(False)
         if self.__thread_reader:
             self.__thread_reader.join()
@@ -42,8 +43,8 @@ class Session:
             self.__thread_writer.join()
 
     def interactive(self, value: bool) -> bool:
-        if (not self.__interactive) and self.__platform:
-            self.__interactive = self.__platform.interactive(True)
+        if (self.__interactive != value) and self.__platform:
+            self.__interactive = self.__platform.interactive(value)
         return self.__interactive
 
     def start(self) -> None:
@@ -54,7 +55,8 @@ class Session:
         self.__thread_writer.start()
 
     def stop(self) -> None:
-        self.__stop_evt.set()
+        if not self.__stop_evt.is_set():
+            self.__stop_evt.set()
         if self.__thread_reader:
             self.__thread_reader.join()
         if self.__thread_writer:
@@ -67,8 +69,11 @@ class Session:
     def wait_open(self, timeout: int=None) -> bool:
         return self.__chan.wait_open(timeout)
 
-    def wait_stop(self, timeout: int=None) -> None:
-        return self.__stop_evt.wait(timeout)
+    def wait_stop(self, timeout: int=None) -> bool:
+        res = self.__stop_evt.wait(timeout)
+        if res:
+            self.stop()
+        return res
 
     def __run_reader(self)-> None:
         self.__running = True
@@ -85,14 +90,17 @@ class Session:
         while not self.__stop_evt.is_set():
             byte = sys.stdin.buffer.read(1)
             if byte:
-                try:
-                    self.send(byte)
-                except socket.error:
+                if byte == b"\x04":
                     self.__stop_evt.set()
-                    error = True
-                except IOError:
-                    self.__stop_evt.set()
-                    error = True
+                else:
+                    try:
+                        self.send(byte)
+                    except socket.error:
+                        self.__stop_evt.set()
+                        error = True
+                    except IOError:
+                        self.__stop_evt.set()
+                        error = True
         if error and self.__chan.is_open:
             self.__chan.close()
 

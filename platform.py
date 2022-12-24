@@ -36,7 +36,8 @@ class Linux(Platform):
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, Platform.LINUX)
         self.__stdin_fd = sys.stdin.fileno()
-        self.__old_settings = termios.tcgetattr(self.__stdin_fd)         
+        self.__old_settings = termios.tcgetattr(self.__stdin_fd)
+        self.__got_pty: bool = False
 
     def which(self, name: str) -> str:
         self.channel.purge()
@@ -81,6 +82,7 @@ class Linux(Platform):
                     got_pty = True
                     break
             if got_pty:
+                self.__got_pty = got_pty
                 break
         self.channel.wait_data()
         time.sleep(0.1)
@@ -90,7 +92,7 @@ class Linux(Platform):
     def interactive(self, value: bool) -> bool:
         res = False
         if value:
-            if self.get_pty():
+            if self.__got_pty or self.get_pty():
                 tty.setraw(self.__stdin_fd)
                 term = os.environ.get("TERM", "xterm")
                 columns, rows = os.get_terminal_size(0) 

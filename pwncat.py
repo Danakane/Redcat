@@ -29,5 +29,16 @@ if __name__ == "__main__":
                 sess.interactive(True)
                 sess.start()
                 sess.wait_stop()
+                sess.stop()
+                sess.interactive(False)
+                print()
+                while True:
+                    try:
+                        print(input("$ "))
+                    except:
+                        break
+                sess.interactive(True)
+                sess.start()
+                sess.wait_stop()
         except KeyboardInterrupt:
             pass

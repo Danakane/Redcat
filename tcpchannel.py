@@ -87,6 +87,8 @@ class TcpChannel(channel.Channel):
             if readables and readables[0] == self.__sock:
                 try:
                     data = self.__sock.recv(4096)
+                except IOError:
+                    pass # to avoid bad descriptor error
                 except Exception as err:
                     self.__error = err.args[1]
                     error = True

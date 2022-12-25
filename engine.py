@@ -9,9 +9,11 @@ import command
 import manager
 
 class Engine:
+
     # -------------------------------------------------------------------------------------------#
     #                                       Private section                                      #
     # -------------------------------------------------------------------------------------------#
+    
     def __init__(self) -> None:
         self.__running: bool = False
         # sessions manager
@@ -62,10 +64,6 @@ class Engine:
         # system command
         cmd_local = command.SystemCommand("local")
         self.__commands[cmd_local.name] = cmd_local
-
-    @property
-    def manager(self) -> manager.Manager:
-        return self.__manager
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:
         res = True
@@ -151,6 +149,11 @@ class Engine:
     # -------------------------------------------------------------------------------------------#
     #                                       Public section                                       #
     # -------------------------------------------------------------------------------------------#
+
+    @property
+    def manager(self) -> manager.Manager:
+        return self.__manager
+
     def run(self) -> None:
         self.__running = True
         while self.__running:

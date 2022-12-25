@@ -7,7 +7,7 @@ import manager
 import engine
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description = "pwncat tool")
+    parser = argparse.ArgumentParser(description = "pwncat: a netcat on steroid for CTFs and pentests")
     parser.add_argument("-l", "--bind", action="store_true", help="listening mode")
     parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
     parser.add_argument("-a", "--addr", type=str, nargs=1, help="address to bind or to connect")

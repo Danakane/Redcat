@@ -4,6 +4,7 @@ import typing
 import subprocess
 import signal
 
+import style
 import command
 import manager
 
@@ -42,7 +43,7 @@ class Engine:
         cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the action in background")
         self.__commands[cmd_listen.name] = cmd_listen
         # kill command
-        cmd_kill = command.Command("kill", self.__manager.kill, "kill the session or listener of the given id")
+        cmd_kill = command.Command("kill", self.__manager.kill, "kill the session or listener for a given id")
         cmd_kill.parser.add_argument("type", type=str, nargs=1, help="type of object to kill: session or listener")
         cmd_kill.parser.add_argument("id", type=str, nargs=1, help="id of object to kill")
         self.__commands[cmd_kill.name] = cmd_kill
@@ -51,7 +52,7 @@ class Engine:
         cmd_show.parser.add_argument("type", type=str, nargs=1, help="type of the objects to display: sessions or listeners")
         self.__commands[cmd_show.name] = cmd_show
         # select session command
-        cmd_session = command.Command("session", self.__manager.select_session, "select the session of the given id (-1 to unselect)")
+        cmd_session = command.Command("session", self.__manager.select_session, "select the session for a given id (-1 to unselect)")
         cmd_session.parser.add_argument("id", type=str, nargs=1, help="id of session to select")
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
@@ -72,7 +73,7 @@ class Engine:
         if cmd:
             name = shlex.split(cmd)[0]
             res = False
-            error = f"unkown command {name}"
+            error = style.bold(f"unknown command ") + style.bold(style.red(f"{name}"))
             if name in self.__commands.keys():
                 res, error = self.__commands[name].exec(cmd)
         return res, error
@@ -88,18 +89,20 @@ class Engine:
 
     def __help(self, name: str = "") -> typing.Tuple[bool, str]:
         res = False
-        error = f"unknown command {name}"
+        error = style.bold(f"unknown command ") + style.bold(style.red(f"{name}"))
         if name:
             if name in self.__commands.keys():
                 self.__commands[name].parser.print_help()
                 res = True
                 error = ""
-                print()
         else:
+            headers = ["Command", "Description"]
+            data = []
             for cmd in self.__commands.values():
-                print(f"{cmd.name}: {cmd.description}")
-                res = True
-                error = ""
+                data.append([cmd.name, cmd.description])
+            print("\n" + style.tabulate(headers, data)+ "\n")
+            res = True
+            error = ""
         return res, error
 
     def __connect(self, addr: str, port: int, platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
@@ -121,12 +124,29 @@ class Engine:
         return res, error
 
     def __show(self, type: str) -> typing.Tuple[bool, str]:
-        error = f"unknown category {type}"
+        error = style.bold("unknown category ") + style.bold(style.red(f"{type}"))
         res, serialization = self.__manager.show(type)
+        data = []
+        if serialization.strip():
+            rows = serialization.split("\n")
+            for row in rows:
+                data.append(row.split(","))
         if res:
             error = ""
-            print(serialization)
+            if type == "sessions":
+                headers = ["ID", "Remote host", "Platform"]
+                print("\n" + style.tabulate(headers, data) + "\n")
+            elif type == "listeners":
+                headers = ["ID", "End point", "Expected platform"]
+                print("\n" + style.tabulate(headers, data) + "\n")
         return res, error
+
+    def __get_prompt(self) -> str:
+        host = self.__manager.get_session_remote()
+        if not host:
+            host = "@localhost"
+        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green("pwncat")) + "🐈"
+        return prompt
 
     # -------------------------------------------------------------------------------------------#
     #                                       Public section                                       #
@@ -135,15 +155,13 @@ class Engine:
         self.__running = True
         while self.__running:
             try:
-                host = self.__manager.get_session_remote()
-                if not host:
-                    host = "@localhost"
-                cmd =  input(f"({host}) pwncat$ ") 
+                prompt = self.__get_prompt()
+                cmd =  input(prompt) 
                 res, error = self.__call(cmd)
                 if not res:
                     if not error:
                         error = "unspecified error"
-                    print(f"[!] error: {error}")
+                    print(style.bold(style.red("[!] error:")) + f" {error}")
             except EOFError:
                 print()
                 if self.__manager.selected_id:

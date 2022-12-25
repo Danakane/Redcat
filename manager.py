@@ -1,6 +1,7 @@
 import typing
 import threading
 
+import style
 import channel
 import platform
 import session
@@ -32,17 +33,19 @@ class Manager:
 
     def clear(self) -> None:
         # stop all listeners
-        for thread, stop_event, _, _ in self.__listeners.values():
+        for thread, stop_event, _, _, _ in self.__listeners.values():
             stop_event.set()
-        for thread, stop_event, _, _ in self.__listeners.values():
+        for thread, stop_event, _, _, _ in self.__listeners.values():
             thread.join()
-        self.__listeners.clear()
+        with self.__lock_listeners:
+            self.__listeners.clear()
         # stop and close all sessions
         for sess in self.__sessions.values():
             sess.stop()
             sess.interactive(False)
             sess.close()
-        self.__sessions.clear()
+        with self.__lock_sessions:
+            self.__sessions.clear()
 
     # create a session
     def __do_create_session(self, addr: str, port: int, platform_name: str, bind: bool, listener_id: str = "", stop_event: threading.Event = None) -> session.Session:
@@ -85,7 +88,7 @@ class Manager:
 
     def create_session(self, addr: str, port: int, platform_name: str = platform.Platform.LINUX, bind: bool = False, background: bool = False) -> typing.Tuple[bool, str]:
         res = False
-        error = "failed to create session"
+        error = style.bold("failed to create session")
         stop_event = threading.Event()
         if not background:
             sess = self.__do_create_session(addr, port, platform_name, bind)
@@ -100,9 +103,8 @@ class Manager:
         else:
             with self.__lock_listeners:
                 stop_event = threading.Event()
-                thread = threading.Thread(target=self.__do_create_session, args
-                                          = (addr, port, platform_name, bind, str(self.__listeners_last_id), stop_event))
-                self.__listeners[str(self.__listeners_last_id)] = (thread, stop_event, addr, port)
+                thread = threading.Thread(target=self.__do_create_session, args = (addr, port, platform_name, bind, str(self.__listeners_last_id), stop_event))
+                self.__listeners[str(self.__listeners_last_id)] = (thread, stop_event, addr, port, platform_name)
                 thread.start()
                 self.__listeners_last_id += 1
                 res = True
@@ -125,53 +127,50 @@ class Manager:
                         self.__selected_session = None
                 else:
                     res = False
-                    error = f"unknown session id {id}"
+                    error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
         elif type == "listener":
             thread = None
             stop_event = None
             with self.__lock_listeners:
                 if id in self.__listeners.keys():
-                    thread, stop_event, _, _ = self.__listeners[id]
+                    thread, stop_event, _, _, _ = self.__listeners[id]
                     stop_event.set()
                     thread.join()
                     del self.__listeners[id]
-
                 else:
                     res = False
-                    error = f"unknown listener id {id}"
+                    error = style.bold("unknown listener id ") + style.bold(style.red(f"{id}"))
         return res, error
 
     def select_session(self, id: str) -> typing.Tuple[int, str]:
         res = False
-        error = f"unknown session id {id}"
-        with self.__lock_sessions:
-            if id == "-1":
-                self.__selected_id = ""
-                self.__selected_session = None
-                res = True
-                error = ""
-            elif id in self.__sessions.keys():
-                self.__selected_id = id
-                self.__selected_session = self.__sessions[id]
-                res = True
-                error = ""
+        error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        if id == "-1":
+            self.__selected_id = ""
+            self.__selected_session = None
+            res = True
+            error = ""
+        elif id in self.__sessions.keys():
+            self.__selected_id = id
+            self.__selected_session = self.__sessions[id]
+            res = True
+            error = ""
         return res, error
 
     def remote_shell(self, id: str = "") -> typing.Tuple[bool, str]:
         res = False 
         if not id:
             id = self.__selected_id
-        error = f"unknown session id {id}"
-        with self.__lock_sessions:
-            if id in self.__sessions.keys():
-                sess = self.__sessions[id]
-                sess.interactive(True) 
-                sess.start()
-                sess.wait_stop()
-                sess.interactive(False)
-                print()
-                res = True
-                error = ""
+        error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        if id in self.__sessions.keys():
+            sess = self.__sessions[id]
+            sess.interactive(True) 
+            sess.start()
+            sess.wait_stop()
+            sess.interactive(False)
+            print()
+            res = True
+            error = ""
         return res, error
 
     def show(self, type: str) -> typing.Tuple[bool, str]:
@@ -179,14 +178,12 @@ class Manager:
         serializations = []
         if type == "sessions":
             res = True
-            with self.__lock_sessions:
-                for id, sess in self.__sessions.items():
-                    serializations.append(f"{id},{sess.remote}")
+            for id, sess in self.__sessions.items():
+                serializations.append(f"{id},{sess.remote},{sess.platform_name}")
         elif type == "listeners":
             res = True
-            with self.__lock_listeners:
-                for id, value in self.__listeners.items():
-                    serializations.append(f"{id},@{value[2]}:{value[3]}")
+            for id, value in self.__listeners.items():
+                serializations.append(f"{id},@{value[2]}:{value[3]},{value[4]}")
         return res, "\n".join(serializations)
 
     def get_session_remote(self, id: str = "") -> str:
@@ -197,3 +194,4 @@ class Manager:
             sess = self.__sessions[id]
             host = sess.remote
         return host
+

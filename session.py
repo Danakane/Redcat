@@ -35,6 +35,10 @@ class Session:
         return self.__chan.local
 
     @property
+    def platform_name(self) -> str:
+        return self.__platform.platform_name
+
+    @property
     def is_open(self) -> bool:
         return self.__chan.is_open
 

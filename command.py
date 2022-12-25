@@ -47,8 +47,8 @@ class Command:
 
 class SystemCommand(Command):
 
-    def __init__(self) -> None:
-        super().__init__("system", self.__system, "run the command in a local shell")
+    def __init__(self, name:str) -> None:
+        super().__init__(name, self.__system, "run the command in a local shell")
         self.parser.add_argument("args", nargs=argparse.REMAINDER)
 
     def __system(self, args):

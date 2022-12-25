@@ -55,7 +55,7 @@ class Engine:
         cmd_shell.parser.add_argument("id", type=str, nargs="?", help="id of session to spawn")
         self.__commands[cmd_shell.name] = cmd_shell
         # system command
-        cmd_local = command.SystemCommand()
+        cmd_local = command.SystemCommand("local")
         self.__commands[cmd_local.name] = cmd_local
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:

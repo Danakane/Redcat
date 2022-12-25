@@ -50,6 +50,16 @@ class Channel(abc.ABC):
     @property
     def state(self) -> int:
         return self.__state
+
+    @property
+    @abstractmethod
+    def remote(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def local(self) -> str:
+        pass
     
     @abstractmethod
     def send(self, data: bytes) -> None:

@@ -42,7 +42,8 @@ class Linux(Platform):
     def which(self, name: str) -> str:
         self.channel.purge()
         self.channel.send(f"which {name}\n".encode())
-        self.channel.wait_data(2)
+        self.channel.wait_data(5)
+        time.sleep(0.1)
         res = self.channel.retrieve()
         return res.decode("UTF-8")
 

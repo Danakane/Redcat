@@ -2,43 +2,32 @@
 
 import argparse
 
-import channel
 import platform
-import session
+import manager
+import engine
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "pwncat tool")
     parser.add_argument("-l", "--bind", action="store_true", help="listening mode")
-    parser.add_argument("-m", "--platform", type=str, nargs=1, help="expected platform (linux or windows)")
-    parser.add_argument("addr", type=str, nargs="?", help="address to bind or to connect")
-    parser.add_argument("port", type=int, nargs=1, help="port to bind or to connect")
-
+    parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
+    parser.add_argument("-a", "--addr", type=str, nargs=1, help="address to bind or to connect")
+    parser.add_argument("-p", "--port", type=int, nargs=1, help="port to bind or to connect")
     args = parser.parse_args()
-    mode = channel.Channel.BIND if args.bind else channel.Channel.CONNECT
+    bind = args.bind
     addr = ""
-    if args.addr:
-        addr = args.addr
-    port = args.port[0]
+    if args.addr and args.addr[0]:
+        addr = args.addr[0]
+    port = 0
+    if args.port and args.port[0]:
+        port = args.port[0]
     platform_name = platform.Platform.LINUX
-    if args.platform and args.platform[0] and args.platform[0].lower() == platform.Platform.WINDOWS:
+    if args.platform_name and args.platform_name[0] and args.platform_name[0].lower() == platform.Platform.WINDOWS:
         platform_name = args.platform[0]
+    try:
+        with engine.Engine() as pwncat:
+            if port:
+                pwncat.manager.create_session(addr, port, platform_name, bind)
+            pwncat.run()
+    except KeyboardInterrupt:
+        pass
 
-    with session.Session(addr, port, mode=mode, platform_name=platform_name) as sess:
-        try:
-            if sess.wait_open():
-                sess.interactive(True)
-                sess.start()
-                sess.wait_stop()
-                sess.stop()
-                sess.interactive(False)
-                print()
-                while True:
-                    try:
-                        print(input("$ "))
-                    except:
-                        break
-                sess.interactive(True)
-                sess.start()
-                sess.wait_stop()
-        except KeyboardInterrupt:
-            pass

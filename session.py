@@ -27,6 +27,14 @@ class Session:
         self.__running: bool = False
 
     @property
+    def remote(self) -> str:
+        return self.__chan.remote
+
+    @property
+    def local(self) -> str:
+        return self.__chan.local
+
+    @property
     def is_open(self) -> bool:
         return self.__chan.is_open
 
@@ -112,6 +120,4 @@ class Session:
         if self.__running:
             self.stop()
         self.close()
-                
-
 

@@ -23,10 +23,24 @@ class TcpChannel(channel.Channel):
             self.__protocol = socket.AF_INET6
         self.__remote: typing.Tuple = ()
         self.__mode: int = mode
-        self.__listenning: bool = False
+        self.__listening: bool = False
         self.__error: str = ""
         self.__serversock: socket.socket = None
         self.__sock: socket.socket = None
+
+    @property
+    def remote(self) -> str:
+        res = ""
+        if self.__remote:
+            res = f"@{self.__remote[0]}:{self.__remote[1]}"
+        return res
+
+    @property
+    def local(self) -> str:
+        local = ""
+        if self.__mode == channel.Channel.BIND:
+            local = f"@{self.__endpoint[0]}:{self.__endpoint[1]}"
+        return local
          
     def listen_or_connect(self) -> bool:
         res: bool = True
@@ -36,7 +50,7 @@ class TcpChannel(channel.Channel):
                 self.__sock.connect(self.__endpoint)
                 self.__remote = self.__endpoint
             else:
-                self.__listenning = True
+                self.__listening = True
                 self.__serversock = socket.socket(self.__protocol, socket.SOCK_STREAM)
                 self.__serversock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 self.__serversock.bind(self.__endpoint)
@@ -48,7 +62,7 @@ class TcpChannel(channel.Channel):
             res = False
             self.__error = err.args[1]
         finally:
-            self.__listenning = False
+            self.__listening = False
         return res
 
     def on_close(self) -> None:
@@ -60,7 +74,7 @@ class TcpChannel(channel.Channel):
             except:
                 pass
         if(self.__serversock):
-            if self.__listenning:
+            if self.__listening:
                 try:
                     sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
                     sock.connect(self.__endpoint)
@@ -77,7 +91,8 @@ class TcpChannel(channel.Channel):
 
     def on_connection_established(self) -> None:
         if self.is_open:
-            print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}") 
+            print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}", end="")
+            sys.stdout.flush()
 
     def recv(self) -> typing.Tuple[bool, bytes]:
         error = False

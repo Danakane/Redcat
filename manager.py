@@ -49,7 +49,7 @@ class Manager:
 
     # create a session
     def __do_create_session(self, addr: str, port: int, platform_name: str, bind: bool, listener_id: str = "", stop_event: threading.Event = None) -> session.Session:
-        mode = channel.Channel.BIND if bind else channel.Channel.CONNECT
+        mode = channel.BIND if bind else channel.CONNECT
         sess = session.Session(addr, port, mode=mode, platform_name=platform_name)
         sess.open()
         id = -1
@@ -72,21 +72,27 @@ class Manager:
                     with self.__lock_sessions:
                         del self.__sessions[id]
         else:
-            if sess.wait_open():
-                with self.__lock_sessions:
-                    id = str(self.__sessions_last_id)
-                    self.__sessions[id] = sess
-                    self.__sessions_last_id += 1
-                    if not self.__selected_session:
-                        self.__selected_session = sess
-                        self.__selected_id = id
+            try:
+                if sess.wait_open():
+                    with self.__lock_sessions:
+                        id = str(self.__sessions_last_id)
+                        self.__sessions[id] = sess
+                        self.__sessions_last_id += 1
+                        if not self.__selected_session:
+                            self.__selected_session = sess
+                            self.__selected_id = id
+            except KeyboardInterrupt:
+                sess.stop()
+                sess.close()
         if sess:
             with self.__lock_listeners:
                 if listener_id in self.__listeners.keys():
                     del self.__listeners[listener_id]
+        if not sess.is_open:
+            sess = None
         return sess
 
-    def create_session(self, addr: str, port: int, platform_name: str = platform.Platform.LINUX, bind: bool = False, background: bool = False) -> typing.Tuple[bool, str]:
+    def create_session(self, addr: str, port: int, platform_name: str = platform.LINUX, bind: bool = False, background: bool = False) -> typing.Tuple[bool, str]:
         res = False
         error = style.bold("failed to create session")
         stop_event = threading.Event()
@@ -194,4 +200,40 @@ class Manager:
             sess = self.__sessions[id]
             host = sess.remote
         return host
+
+    def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
+        res = False
+        error = style.bold("download operation failed")
+        if not id:
+            id = self.__selected_id
+        if id in self.__sessions.keys():
+            sess = self.__sessions[id]
+            res, error, data = sess.download(rfile)
+            if res:
+                with open(lfile, "wb") as f:
+                    f.write(data)
+        else:
+            if not id:
+                error = style.bold("no session selected for the download operation")
+            else:
+                error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        return res, error
+ 
+    def upload(self, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
+        res = False
+        error = style.bold("upload operation failed")
+        if not id:
+            id = self.__selected_id
+        if id in self.__sessions.keys():
+            sess = self.__sessions[id]
+            with open(lfile, "rb") as f:
+                data = f.read()
+                res, error = sess.upload(rfile, data)
+        else:
+            if not id:
+                error = style.bold("no session selected for the upload operation")
+            else:
+                error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        return res, error
+
 

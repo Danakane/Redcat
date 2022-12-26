@@ -38,14 +38,14 @@ class TcpChannel(channel.Channel):
     @property
     def local(self) -> str:
         local = ""
-        if self.__mode == channel.Channel.BIND:
+        if self.__mode == channel.BIND:
             local = f"@{self.__endpoint[0]}:{self.__endpoint[1]}"
         return local
          
     def listen_or_connect(self) -> bool:
         res: bool = True
         try:
-            if self.__mode == channel.Channel.CONNECT:
+            if self.__mode == channel.CONNECT:
                 self.__sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
                 self.__sock.connect(self.__endpoint)
                 self.__remote = self.__endpoint
@@ -95,7 +95,7 @@ class TcpChannel(channel.Channel):
             sys.stdout.flush()
 
     def recv(self) -> typing.Tuple[bool, bytes]:
-        error = False
+        res = True
         data = b""
         try:
             readables, _, _= select.select([self.__sock], [], [], 0.05)
@@ -106,11 +106,11 @@ class TcpChannel(channel.Channel):
                     pass # to avoid bad descriptor error
                 except Exception as err:
                     self.__error = err.args[1]
-                    error = True
+                    res = False
         except select.error as err:
-            error = True
+            res = False
             self.__error = err.args[1]
-        return error, data
+        return res, data
 
     def send(self, data: bytes) -> None:
         self.__sock.send(data)

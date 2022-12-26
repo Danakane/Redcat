@@ -4,22 +4,23 @@ import socket
 import termios
 import threading
 import tty
+import typing
+import base64
 
-import channel
-import tcpchannel
-import platform
+import channel, channel.factory
+import platform, platform.factory
+import transaction
 
 
 class Session: 
 
-    def __init__(self, addr: str, port: int, channel_protocol:int=channel.Channel.TCP,
-                 mode:int=channel.Channel.BIND, platform_name: str=platform.Platform.LINUX) -> None:
+    def __init__(self, addr: str, port: int, channel_protocol:int=channel.TCP,
+                 mode:int=channel.BIND, platform_name: str=platform.LINUX) -> None:
         self.__chan: channel.Channel = None
         self.__platform: platform.Platform = None
-        if channel_protocol == channel.Channel.TCP:
-            self.__chan = tcpchannel.TcpChannel(addr, port, mode, threading.Event())
+        self.__chan: channel.Channel = channel.factory.get_channel(addr, port, mode, channel_protocol)
         if self.__chan:
-            self.__platform = platform.get_platform(self.__chan, platform_name)
+            self.__platform = platform.factory.get_platform(self.__chan, platform_name)
         self.__interactive: bool = False
         self.__thread_reader: threading.Thread = None
         self.__thread_writer: threading.Thread = None
@@ -115,6 +116,12 @@ class Session:
                         error = True
         if error and self.__chan.is_open:
             self.__chan.close()
+
+    def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
+        return self.__platform.download(rfile)
+
+    def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
+        return self.__platform.upload(rfile, data)
 
     def __enter__(self):
         self.open()

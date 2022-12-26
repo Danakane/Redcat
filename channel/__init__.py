@@ -2,6 +2,7 @@ import enum
 import queue
 import sys
 import threading
+import time
 import typing
 import abc
 from abc import abstractmethod
@@ -30,7 +31,7 @@ class Channel(abc.ABC):
         self.__has_data_evt: threading.Event() = threading.Event()
         self.__dataqueue: typing.Queue = queue.Queue()
         self.__queue_lock: threading.Lock = threading.Lock()
-
+        self.__transaction_lock: threading.Lock = threading.Lock()
 
     @property
     def is_open(self) -> bool:
@@ -130,7 +131,7 @@ class Channel(abc.ABC):
     def exec_transaction(self, data: bytes, start: bytes, end: bytes, has_echo: bool) -> typing.Tuple[bool, bytes]:
         res = True
         rdata = b""
-        with self.__queue_lock:
+        with self.__transaction_lock:
             self.send(data)
             rdata = b""
             resp = b""
@@ -177,13 +178,15 @@ class Channel(abc.ABC):
                 self.__ready_evt.set()
                 self.on_connection_established()
                 while not self.__stop_evt.is_set():
-                    res, data = self.recv()
-                    if not res:
-                        self.error()
-                        self.__stop_evt.set()
-                    else:
-                        if data:
-                            self.collect(data)
+                    with self.__transaction_lock:
+                        res, data = self.recv()
+                        if not res:
+                            self.error()
+                            self.__stop_evt.set()
+                        else:
+                            if data:
+                                self.collect(data)
+                    time.sleep(0.05) # small delay to prevent transaction starvation
             else:
                 self.__stop_evt.set()
         else:

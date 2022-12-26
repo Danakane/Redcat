@@ -99,8 +99,8 @@ class Linux(Platform):
                         ]
                     )
                 ).encode()
-                transaction.Transaction(payload, self.channel, self, True).execute()
-                self.channel.wait_data(5)
+                transaction.Transaction(payload, self.channel, self).execute()
+                self.channel.wait_data(0.5)
                 time.sleep(0.1)
                 self.channel.purge()
                 self.channel.send(b"\n")

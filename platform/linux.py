@@ -6,6 +6,7 @@ import tty
 import typing
 import base64
 
+import style
 import channel
 import transaction
 from platform import Platform, LINUX
@@ -42,10 +43,17 @@ class Linux(Platform):
         # the lock is used for performance -> starve the session reader main loop
         # Don't handle echo, it's less error prone and we don't care about the output anyway
         with self.channel.transaction_lock:
+            length = len(chunks)
+            style.print_progress_bar(0, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
             res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {rfile}.tmp".encode(), self.channel, self, False).execute()
-            if len(chunks) > 1:
+            i = 1
+            style.print_progress_bar(i, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
+            if length > 1:
                 for chunk in chunks[1:]:
+                    i += 1
                     res, _ = transaction.Transaction(b"echo " + chunk + f" >> {rfile}.tmp".encode(), self.channel, self, False).execute()
+                    style.print_progress_bar(i, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
+            print()
             # decode the temporary file into the final file and delete the temporary file
             res, _ = transaction.Transaction(f"base64 -d {rfile}.tmp > {rfile}".encode(), self.channel, self, False).execute()
             res, _ = transaction.Transaction(f"rm {rfile}.tmp".encode(), self.channel, self, False).execute()

@@ -26,14 +26,29 @@ class Linux(Platform):
         return data.decode("utf-8")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
+        res = False
+        error = style.bold("Failed to download remote file ") + style.bold(style.red(f"{rfile}"))
         self.channel.purge()
         # Handle echo because we're not in raw mode and
         # and the command if handled can pollute the output
-        res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
-        data = base64.b64decode(data)
-        return res, "", data
+        res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, True).execute()
+        if b"No such file or directory" in data:
+            res = False
+            error = style.bold("can't find remote file ") + style.bold(style.red(f"{rfile}"))
+        elif b"Is a directory" in data:
+            res = False
+            error = style.bold("remote ") + style.bold(style.red(f"{rfile}")) + style.bold(" is a directory")
+        elif b"Permission denied" in data:
+            res = False
+            error = style.bold("don't have permission to read remote file ") + style.bold(style.red(f"{rfile}"))
+        else:
+            res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
+            data = base64.b64decode(data)
+        return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
+        res = False
+        error = style.bold("Failed to upload file ") + style.bold(style.red(f"{rfile}")) 
         self.channel.purge()
         encoded = base64.b64encode(data)
         # devide encoded data into chunks of 4096 bytes at most
@@ -44,20 +59,28 @@ class Linux(Platform):
         # Don't handle echo, it's less error prone and we don't care about the output anyway
         with self.channel.transaction_lock:
             length = len(chunks)
-            style.print_progress_bar(0, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
-            res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {rfile}.tmp".encode(), self.channel, self, False).execute()
-            i = 1
-            style.print_progress_bar(i, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
-            if length > 1:
-                for chunk in chunks[1:]:
-                    i += 1
-                    res, _ = transaction.Transaction(b"echo " + chunk + f" >> {rfile}.tmp".encode(), self.channel, self, False).execute()
-                    style.print_progress_bar(i, length, prefix = 'Upload:', suffix = 'Complete', length = 50)
-            print()
-            # decode the temporary file into the final file and delete the temporary file
-            res, _ = transaction.Transaction(f"base64 -d {rfile}.tmp > {rfile}".encode(), self.channel, self, False).execute()
-            res, _ = transaction.Transaction(f"rm {rfile}.tmp".encode(), self.channel, self, False).execute()
-        return res, ""
+            style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+            tmp_file = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_") + ".tmp"
+            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self.channel, self, False).execute()
+            res, data = transaction.Transaction(f"head -1 {tmp_file} > /dev/null".encode(), self.channel, self, True).execute()
+            if b"No such file or directory" in data:
+                res = False
+                error = style.bold("don't have permission to write in remote parent directory")
+            else:
+                res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self.channel, self, False).execute()
+                i = 1
+                style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                if length > 1:
+                    for chunk in chunks[1:]:
+                        i += 1
+                        res, _ = transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self.channel, self, False).execute()
+                        style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                print()
+                # decode the temporary file into the final file and delete the temporary file
+                res, _ = transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self.channel, self, False).execute()
+                res, _ = transaction.Transaction(f"rm {tmp_file}".encode(), self.channel, self, False).execute()
+                error = ""
+        return res, error
 
     def get_pty(self) -> bool:
         got_pty: bool = False

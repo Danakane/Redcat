@@ -88,7 +88,7 @@ class Manager:
             with self.__lock_listeners:
                 if listener_id in self.__listeners.keys():
                     del self.__listeners[listener_id]
-        if not sess.is_open:
+        if sess and not sess.is_open:
             sess = None
         return sess
 
@@ -210,8 +210,13 @@ class Manager:
             sess = self.__sessions[id]
             res, error, data = sess.download(rfile)
             if res:
-                with open(lfile, "wb") as f:
-                    f.write(data)
+                try:
+                    with open(lfile, "wb") as f:
+                        f.write(data)
+                except FileNotFoundError:
+                    error = style.bold("cannot write local file ") + style.bold(style.red(f"{lfile}")) + style.bold(": parent directory not found")
+                except PermissionError:
+                    error = style.bold("don't have permission to write local file ") + style.bold(style.red(f"{lfile}")) 
         else:
             if not id:
                 error = style.bold("no session selected for the download operation")
@@ -226,9 +231,16 @@ class Manager:
             id = self.__selected_id
         if id in self.__sessions.keys():
             sess = self.__sessions[id]
-            with open(lfile, "rb") as f:
-                data = f.read()
-                res, error = sess.upload(rfile, data)
+            try:
+                with open(lfile, "rb") as f:
+                    data = f.read()
+                    res, error = sess.upload(rfile, data)
+            except FileNotFoundError:
+                error = style.bold("local file ") + style.bold(style.red(f"{lfile}")) + style.bold(" not found")
+            except IsADirectoryError:
+                error = style.bold("local ") + style.bold(style.red(f"{lfile}")) + style.bold(" is a directory")
+            except PermissionError:
+                error = style.bold("don't have permission to read local file ") + style.bold(style.red(f"{lfile}")) 
         else:
             if not id:
                 error = style.bold("no session selected for the upload operation")

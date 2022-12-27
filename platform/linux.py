@@ -35,8 +35,8 @@ class Linux(Platform):
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         self.channel.purge()
         encoded = base64.b64encode(data)
-        # devide encoded data into chunks of 2048 bytes at most (4096 may be too big)
-        n = 2048
+        # devide encoded data into chunks of 4096 bytes at most
+        n = 4096
         chunks = [encoded[i:i+n] for i in range(0, len(encoded), n)]
         # then for each chunk execute a transaction to write into a temporary file
         # the lock is used for performance -> starve the session reader main loop

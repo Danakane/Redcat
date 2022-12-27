@@ -107,7 +107,8 @@ class Session:
                     self.__stop_evt.set()
                 else:
                     try:
-                        self.send(byte)
+                        with self.__chan.transaction_lock:
+                            self.send(byte)
                     except socket.error:
                         self.__stop_evt.set()
                         error = True

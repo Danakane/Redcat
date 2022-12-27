@@ -26,8 +26,7 @@ class Linux(Platform):
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         self.channel.purge()
-        # passing has_echo parameter to True
-        # because we're not in raw mode and
+        # Handle echo because we're not in raw mode and
         # and the command if handled can pollute the output
         res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
         data = base64.b64decode(data)
@@ -36,9 +35,20 @@ class Linux(Platform):
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         self.channel.purge()
         encoded = base64.b64encode(data)
-        # passing has_echo parameter to False because True may cause channel to hang
-        # And we don't care about the output anyway
-        res, _ = transaction.Transaction(b"echo " + encoded + f" | base64 -d > {rfile}".encode(), self.channel, self, False).execute()
+        # devide encoded data into chunks of 2048 bytes at most (4096 may be too big)
+        n = 2048
+        chunks = [encoded[i:i+n] for i in range(0, len(encoded), n)]
+        # then for each chunk execute a transaction to write into a temporary file
+        # the lock is used for performance -> starve the session reader main loop
+        # Don't handle echo, it's less error prone and we don't care about the output anyway
+        with self.channel.transaction_lock:
+            res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {rfile}.tmp".encode(), self.channel, self, False).execute()
+            if len(chunks) > 1:
+                for chunk in chunks[1:]:
+                    res, _ = transaction.Transaction(b"echo " + chunk + f" >> {rfile}.tmp".encode(), self.channel, self, False).execute()
+            # decode the temporary file into the final file and delete the temporary file
+            res, _ = transaction.Transaction(f"base64 -d {rfile}.tmp > {rfile}".encode(), self.channel, self, False).execute()
+            res, _ = transaction.Transaction(f"rm {rfile}.tmp".encode(), self.channel, self, False).execute()
         return res, ""
 
     def get_pty(self) -> bool:

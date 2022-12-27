@@ -31,7 +31,7 @@ class Channel(abc.ABC):
         self.__has_data_evt: threading.Event() = threading.Event()
         self.__dataqueue: typing.Queue = queue.Queue()
         self.__queue_lock: threading.Lock = threading.Lock()
-        self.__transaction_lock: threading.Lock = threading.Lock()
+        self.__transaction_lock: threading.RLock = threading.RLock()
 
     @property
     def is_open(self) -> bool:
@@ -52,6 +52,10 @@ class Channel(abc.ABC):
     @property
     def state(self) -> int:
         return self.__state
+
+    @property
+    def transaction_lock(self) -> threading.RLock:
+        return self.__transaction_lock
 
     @property
     @abstractmethod
@@ -128,7 +132,7 @@ class Channel(abc.ABC):
             while not self.__dataqueue.empty():
                 self.__dataqueue.queue.clear()
 
-    def exec_transaction(self, data: bytes, start: bytes, end: bytes, has_echo: bool) -> typing.Tuple[bool, bytes]:
+    def exec_transaction(self, data: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
         res = True
         rdata = b""
         with self.__transaction_lock:
@@ -137,7 +141,7 @@ class Channel(abc.ABC):
             resp = b""
             start_received = False
             end_received = False
-            if has_echo:
+            if handle_echo:
                 # purge the command echo
                 while res and (end not in rdata):
                     res, resp = self.recv()

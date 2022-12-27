@@ -63,6 +63,8 @@ class Manager:
                         if not self.__selected_session:
                             self.__selected_session = sess
                             self.__selected_id = id
+                        sess.interactive(True) # getting pty immediately
+                        sess.interactive(False)
                         break
             if stop_event.is_set():
                 sess.stop()

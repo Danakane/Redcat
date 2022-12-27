@@ -20,8 +20,8 @@ if __name__ == "__main__":
     port = 0
     if args.port and args.port[0]:
         port = args.port[0]
-    platform_name = platform.Platform.LINUX
-    if args.platform_name and args.platform_name[0] and args.platform_name[0].lower() == platform.Platform.WINDOWS:
+    platform_name = platform.LINUX
+    if args.platform_name and args.platform_name[0] and args.platform_name[0].lower() == platform.WINDOWS:
         platform_name = args.platform[0]
     try:
         with engine.Engine() as pwncat:

@@ -3,49 +3,53 @@ import sys
 import termios
 import time
 import tty
-import abc
-from abc import abstractmethod
+import typing
+import base64
 
 import channel
-
-
-class Platform(abc.ABC):
-
-    LINUX="linux"
-    WINDOWS="windows"
-
-    def __init__(self, chan: channel.Channel, platform_name) -> None:
-        self.__chan: channel.Channel = chan
-        self.__platform_name: str = platform_name.lower()
-
-    @property
-    def platform_name(self) -> str:
-        return self.__platform_name
-
-    @property
-    def channel(self) -> channel.Channel:
-        return self.__chan
-
-    @abstractmethod
-    def interactive(self, value: bool) -> bool:
-        pass
+import transaction
+from platform import Platform, LINUX
 
 
 class Linux(Platform):
 
     def __init__(self, chan: channel.Channel) -> None:
-        super().__init__(chan, Platform.LINUX)
+        super().__init__(chan, LINUX)
         self.__stdin_fd = sys.stdin.fileno()
         self.__old_settings = termios.tcgetattr(self.__stdin_fd)
         self.__got_pty: bool = False
 
     def which(self, name: str) -> str:
         self.channel.purge()
-        self.channel.send(f"which {name}\n".encode())
-        self.channel.wait_data(5)
-        time.sleep(0.1)
-        res = self.channel.retrieve()
-        return res.decode("UTF-8")
+        res, data = transaction.Transaction(f"which {name}".encode(), self.channel, self, not self.interactive).execute()
+        return data.decode("utf-8")
+
+    def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
+        self.channel.purge()
+        # Handle echo because we're not in raw mode and
+        # and the command if handled can pollute the output
+        res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
+        data = base64.b64decode(data)
+        return res, "", data
+
+    def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
+        self.channel.purge()
+        encoded = base64.b64encode(data)
+        # devide encoded data into chunks of 4096 bytes at most
+        n = 4096
+        chunks = [encoded[i:i+n] for i in range(0, len(encoded), n)]
+        # then for each chunk execute a transaction to write into a temporary file
+        # the lock is used for performance -> starve the session reader main loop
+        # Don't handle echo, it's less error prone and we don't care about the output anyway
+        with self.channel.transaction_lock:
+            res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {rfile}.tmp".encode(), self.channel, self, False).execute()
+            if len(chunks) > 1:
+                for chunk in chunks[1:]:
+                    res, _ = transaction.Transaction(b"echo " + chunk + f" >> {rfile}.tmp".encode(), self.channel, self, False).execute()
+            # decode the temporary file into the final file and delete the temporary file
+            res, _ = transaction.Transaction(f"base64 -d {rfile}.tmp > {rfile}".encode(), self.channel, self, False).execute()
+            res, _ = transaction.Transaction(f"rm {rfile}.tmp".encode(), self.channel, self, False).execute()
+        return res, ""
 
     def get_pty(self) -> bool:
         got_pty: bool = False
@@ -77,15 +81,14 @@ class Linux(Platform):
             for binary in binaries:
                 res = self.which(binary)
                 if binary in res:
-                    payload = payload_format.format(
-                            binary_path=binary, shell=best_shell)
+                    payload = payload_format.format(binary_path=binary, shell=best_shell)
                     self.channel.send(payload.encode())
                     got_pty = True
                     break
             if got_pty:
                 self.__got_pty = got_pty
                 break
-        self.channel.wait_data()
+        self.channel.wait_data(5)
         time.sleep(0.1)
         self.channel.purge()
         return got_pty
@@ -105,11 +108,10 @@ class Linux(Platform):
                             f" export TERM='{term}'",
                         ]
                     )
-                    + "\n"
-                )
-                self.channel.send(payload.encode())
-                self.channel.wait_data(2)
-                time.sleep(0.5)
+                ).encode()
+                transaction.Transaction(payload, self.channel, self).execute()
+                self.channel.wait_data(0.5)
+                time.sleep(0.1)
                 self.channel.purge()
                 self.channel.send(b"\n")
                 res = True
@@ -117,21 +119,4 @@ class Linux(Platform):
             termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
         return res
 
-
-class Windows(Platform):
-
-    def __init__(self, chan: channel.Channel) -> None:
-        super().__init__(chan, Platform.WINDOWS)
-
-    def interactive(self, value: bool) -> bool:
-        return value
-
-
-def get_platform(chan: channel.Channel, platform_name: str) -> Platform:
-    platform = None
-    if platform_name.lower() == Platform.LINUX:
-        platform = Linux(chan)
-    elif platform_name.lower() == Platform.WINDOWS:
-        platform = Windows(chan)
-    return platform
 

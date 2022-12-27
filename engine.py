@@ -61,6 +61,18 @@ class Engine:
         cmd_shell = command.Command("shell", self.__manager.remote_shell, "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
         cmd_shell.parser.add_argument("id", type=str, nargs="?", help="id of session to spawn")
         self.__commands[cmd_shell.name] = cmd_shell
+        # download command
+        cmd_download = command.Command("download", self.__manager.download, "download a file from remote host for a given session id")
+        cmd_download.parser.add_argument("rfile", type=str, nargs=1, help="remote file to download")
+        cmd_download.parser.add_argument("lfile", type=str, nargs=1, help="local path for the downloaded file")
+        cmd_download.parser.add_argument("id", type=str, nargs="?", help="id of the session")
+        self.__commands[cmd_download.name] = cmd_download
+        # upload commands
+        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 10kb)")
+        cmd_upload.parser.add_argument("lfile", type=str, nargs=1, help="local file to upload")
+        cmd_upload.parser.add_argument("rfile", type=str, nargs=1, help="remote path for the uploaded file")
+        cmd_upload.parser.add_argument("id", type=str, nargs="?", help="id of the session")
+        self.__commands[cmd_upload.name] = cmd_upload
         # system command
         cmd_local = command.SystemCommand("local")
         self.__commands[cmd_local.name] = cmd_local

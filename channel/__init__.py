@@ -2,9 +2,17 @@ import enum
 import queue
 import sys
 import threading
+import time
 import typing
 import abc
 from abc import abstractmethod
+
+import utils
+
+TCP: int = 0
+
+BIND: int = 0
+CONNECT: int = 1
 
 class ChannelState(enum.Enum):
     ERROR = -1
@@ -13,14 +21,8 @@ class ChannelState(enum.Enum):
     OPENNING = 2
     CLOSING = 3
 
-
-
 class Channel(abc.ABC):
 
-    TCP: int = 0
-
-    BIND: int = 0
-    CONNECT: int = 1
     def __init__(self, stop_evt: threading.Event) -> None:
         self.__thread: threading.Thread = None
         self.__state: int = ChannelState.CLOSED
@@ -29,7 +31,7 @@ class Channel(abc.ABC):
         self.__has_data_evt: threading.Event() = threading.Event()
         self.__dataqueue: typing.Queue = queue.Queue()
         self.__queue_lock: threading.Lock = threading.Lock()
-
+        self.__transaction_lock: threading.RLock = threading.RLock()
 
     @property
     def is_open(self) -> bool:
@@ -50,6 +52,10 @@ class Channel(abc.ABC):
     @property
     def state(self) -> int:
         return self.__state
+
+    @property
+    def transaction_lock(self) -> threading.RLock:
+        return self.__transaction_lock
 
     @property
     @abstractmethod
@@ -126,6 +132,43 @@ class Channel(abc.ABC):
             while not self.__dataqueue.empty():
                 self.__dataqueue.queue.clear()
 
+    def exec_transaction(self, data: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+        res = True
+        rdata = b""
+        with self.__transaction_lock:
+            self.send(data)
+            rdata = b""
+            resp = b""
+            start_received = False
+            end_received = False
+            if handle_echo:
+                # purge the command echo
+                while res and (end not in rdata):
+                    res, resp = self.recv()
+                    rdata += resp
+                resp = b""
+                rdata = utils.extract_data(rdata, end)
+            while res and (not start_received):
+                res, resp = self.recv()
+                rdata += resp
+                if start in rdata:
+                    start_received = True
+            if end in rdata:
+                end_received = True
+            while res and (not end_received):
+                res, resp = self.recv()
+                rdata += resp
+                if end in rdata:
+                    end_received = True
+            resp = b"placeholder"
+            while res and (len(resp) > 0): # clear remaining data in the channel
+                res, resp = self.recv()
+        if not res:
+            rdata = b""
+        else:
+            rdata = utils.extract_data(rdata, start, end)
+        return res, rdata
+
     def wait_open(self, timeout=None) -> bool:
         return self.__ready_evt.wait(timeout)
 
@@ -139,13 +182,15 @@ class Channel(abc.ABC):
                 self.__ready_evt.set()
                 self.on_connection_established()
                 while not self.__stop_evt.is_set():
-                    error, data = self.recv()
-                    if error:
-                        self.error()
-                        self.__stop_evt.set()
-                    else:
-                        if data:
-                            self.collect(data)
+                    with self.__transaction_lock:
+                        res, data = self.recv()
+                        if not res:
+                            self.error()
+                            self.__stop_evt.set()
+                        else:
+                            if data:
+                                self.collect(data)
+                    time.sleep(0.05) # small delay to prevent transaction starvation
             else:
                 self.__stop_evt.set()
         else:

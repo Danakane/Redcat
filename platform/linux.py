@@ -5,6 +5,7 @@ import time
 import tty
 import typing
 import base64
+import shlex
 
 import style
 import channel
@@ -25,25 +26,32 @@ class Linux(Platform):
         res, data = transaction.Transaction(f"which {name}".encode(), self.channel, self, not self.interactive).execute()
         return data.decode("utf-8")
 
+    def id(self, name: str) -> str:
+        self.channel.purge()
+        res, data = transaction.Transaction(f"id".encode(), self.channel, self, False).execute()
+        return data.decode("utf-8")
+
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
         error = style.bold("Failed to download remote file ") + style.bold(style.red(f"{rfile}"))
         self.channel.purge()
-        # Handle echo because we're not in raw mode and
-        # and the command if handled can pollute the output
-        res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, True).execute()
-        if b"No such file or directory" in data:
-            res = False
-            error = style.bold("can't find remote file ") + style.bold(style.red(f"{rfile}"))
-        elif b"Is a directory" in data:
-            res = False
-            error = style.bold("remote ") + style.bold(style.red(f"{rfile}")) + style.bold(" is a directory")
-        elif b"Permission denied" in data:
-            res = False
-            error = style.bold("don't have permission to read remote file ") + style.bold(style.red(f"{rfile}"))
-        else:
-            res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
-            data = base64.b64decode(data)
+        # The first head transaction result is corrupted with ansi escape characters for some reason
+        # for now just do the transaction twice until I find better fix
+        with self.channel.transaction_lock:
+            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, False).execute()
+            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, True).execute()
+            if b"No such file or directory" in data:
+                res = False
+                error = style.bold("can't find remote file ") + style.bold(style.red(f"{rfile}"))
+            elif b"Is a directory" in data:
+                res = False
+                error = style.bold("remote ") + style.bold(style.red(f"{rfile}")) + style.bold(" is a directory")
+            elif b"Permission denied" in data:
+                res = False
+                error = style.bold("don't have permission to read remote file ") + style.bold(style.red(f"{rfile}"))
+            else:
+                res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
+                data = base64.b64decode(data)
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
@@ -58,15 +66,24 @@ class Linux(Platform):
         # the lock is used for performance -> starve the session reader main loop
         # Don't handle echo, it's less error prone and we don't care about the output anyway
         with self.channel.transaction_lock:
-            length = len(chunks)
-            style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+            length = len(chunks) 
             tmp_file = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_") + ".tmp"
+            parent = os.path.dirname(rfile)
+            if parent:
+                tmp_file = f"{parent}/{tmp_file}"
+            tmp_file = shlex.quote(tmp_file)
+            # The first touch transaction result is corrupted with ansi escape characters for some reason
+            # for now just do the transaction twice until I find better fix
             res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self.channel, self, False).execute()
-            res, data = transaction.Transaction(f"head -1 {tmp_file} > /dev/null".encode(), self.channel, self, True).execute()
+            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self.channel, self, True).execute()
             if b"No such file or directory" in data:
+                res = False
+                error = style.bold("can't find remote parent directory")
+            elif b"Permission denied" in data:
                 res = False
                 error = style.bold("don't have permission to write in remote parent directory")
             else:
+                style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self.channel, self, False).execute()
                 i = 1
                 style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
@@ -77,6 +94,7 @@ class Linux(Platform):
                         style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
+                rfile = shlex.quote(rfile)
                 res, _ = transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self.channel, self, False).execute()
                 res, _ = transaction.Transaction(f"rm {tmp_file}".encode(), self.channel, self, False).execute()
                 error = ""

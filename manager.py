@@ -1,5 +1,6 @@
 import typing
 import threading
+import shlex
 
 import style
 import channel
@@ -206,6 +207,7 @@ class Manager:
     def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = style.bold("download operation failed")
+        rfile = shlex.quote(rfile) # to avoid remote command injection though it's kinda useless
         if not id:
             id = self.__selected_id
         if id in self.__sessions.keys():
@@ -216,8 +218,10 @@ class Manager:
                     with open(lfile, "wb") as f:
                         f.write(data)
                 except FileNotFoundError:
+                    res = False
                     error = style.bold("cannot write local file ") + style.bold(style.red(f"{lfile}")) + style.bold(": parent directory not found")
                 except PermissionError:
+                    res = False
                     error = style.bold("don't have permission to write local file ") + style.bold(style.red(f"{lfile}")) 
         else:
             if not id:
@@ -238,10 +242,13 @@ class Manager:
                     data = f.read()
                     res, error = sess.upload(rfile, data)
             except FileNotFoundError:
+                res = False
                 error = style.bold("local file ") + style.bold(style.red(f"{lfile}")) + style.bold(" not found")
             except IsADirectoryError:
+                res = False
                 error = style.bold("local ") + style.bold(style.red(f"{lfile}")) + style.bold(" is a directory")
             except PermissionError:
+                res = False
                 error = style.bold("don't have permission to read local file ") + style.bold(style.red(f"{lfile}")) 
         else:
             if not id:

@@ -33,6 +33,9 @@ class Platform(abc.ABC):
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         return False, style.bold(f"not implemented for {self.__platform_name} platform")
 
+    def whoami(self) -> typing.Tuple[bool, str, str]:
+        return False, style.bold(f"not implemented for {self.__platform_name} platform"), ""
+
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
         return b"echo " + start + b";" + payload + b";" + b"echo " + end + b"\n"
    

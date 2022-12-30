@@ -47,6 +47,10 @@ class Session:
     def is_open(self) -> bool:
         return self.__chan.is_open
 
+    @property
+    def is_interactive(self) -> bool:
+        return self.__interactive
+
     def open(self) -> None:
         self.__chan.open()
 

@@ -144,7 +144,7 @@ class Engine:
         if res:
             error = ""
             if type == "sessions":
-                headers = ["ID", "Remote host", "Platform"]
+                headers = ["ID", "User", "Remote host", "Platform"]
                 print("\n" + style.tabulate(headers, data) + "\n")
             elif type == "listeners":
                 headers = ["ID", "End point", "Expected platform"]

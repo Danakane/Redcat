@@ -20,16 +20,22 @@ class Linux(Platform):
         self.__stdin_fd = sys.stdin.fileno()
         self.__old_settings = termios.tcgetattr(self.__stdin_fd)
         self.__got_pty: bool = False
+        self.__interactive: bool = False
 
     def which(self, name: str) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"which {name}".encode(), self.channel, self, not self.interactive).execute()
+        res, data = transaction.Transaction(f"which {name}".encode(), self.channel, self, False).execute()
         return data.decode("utf-8")
 
-    def id(self, name: str) -> str:
+    def id(self) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"id".encode(), self.channel, self, False).execute()
+        res, data = transaction.Transaction(f"id -u".encode(), self.channel, self, not self.__interactive).execute()
         return data.decode("utf-8")
+
+    def whoami(self) -> typing.Tuple[bool, str, str]:
+        self.channel.purge()
+        res, data = transaction.Transaction(f"whoami".encode(), self.channel, self, not self.__interactive).execute()
+        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
@@ -166,6 +172,7 @@ class Linux(Platform):
                 res = True
         else:
             termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
-        return res
+        self.__interactive = res
+        return self.__interactive
 
 

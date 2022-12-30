@@ -188,7 +188,8 @@ class Manager:
         if type == "sessions":
             res = True
             for id, sess in self.__sessions.items():
-                serializations.append(f"{id},{sess.remote},{sess.platform_name}")
+                res, error, user = sess.platform.whoami()
+                serializations.append(f"{id},{user},{sess.remote},{sess.platform_name}")
         elif type == "listeners":
             res = True
             for id, value in self.__listeners.items():

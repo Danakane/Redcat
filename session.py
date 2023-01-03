@@ -1,5 +1,6 @@
 import os
 import sys
+import select
 import socket
 import termios
 import threading
@@ -92,7 +93,7 @@ class Session:
 
     def wait_stop(self, timeout: int=None) -> bool:
         res = self.__stop_evt.wait(timeout)
-        if res:
+        if res :
             self.stop()
         return res
 
@@ -110,19 +111,18 @@ class Session:
         error = False
         while not self.__stop_evt.is_set():
             byte = sys.stdin.buffer.read(1)
-            if byte:
-                if byte == b"\x04":
+            if (not byte) or (byte == b"\x04"):
+                self.__stop_evt.set()
+            else:
+                try:
+                    with self.__chan.transaction_lock:
+                        self.send(byte)
+                except socket.error:
                     self.__stop_evt.set()
-                else:
-                    try:
-                        with self.__chan.transaction_lock:
-                            self.send(byte)
-                    except socket.error:
-                        self.__stop_evt.set()
-                        error = True
-                    except IOError:
-                        self.__stop_evt.set()
-                        error = True
+                    error = True
+                except IOError:
+                    self.__stop_evt.set()
+                    error = True
         if error and self.__chan.is_open:
             self.__chan.close()
 

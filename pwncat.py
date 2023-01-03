@@ -23,11 +23,14 @@ if __name__ == "__main__":
     platform_name = platform.LINUX
     if args.platform_name and args.platform_name[0] and args.platform_name[0].lower() == platform.WINDOWS:
         platform_name = args.platform[0]
-    try:
-        with engine.Engine() as pwncat:
-            if port:
+    interrupted = False
+    with engine.Engine() as pwncat:
+        if port:
+            try:
                 pwncat.manager.create_session(addr, port, platform_name, bind)
+            except KeyboardInterrupt:
+                interrupted = False
+                pass
+        if not interrupted:
             pwncat.run()
-    except KeyboardInterrupt:
-        pass
 

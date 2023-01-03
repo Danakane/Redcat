@@ -1,3 +1,6 @@
+import tty
+import termios
+import sys
 
 import channel
 from platform import Platform, WINDOWS
@@ -10,5 +13,4 @@ class Windows(Platform):
 
     def interactive(self, value: bool) -> bool:
         return value
-
 

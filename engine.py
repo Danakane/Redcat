@@ -135,20 +135,23 @@ class Engine:
 
     def __show(self, type: str) -> typing.Tuple[bool, str]:
         error = style.bold("unknown category ") + style.bold(style.red(f"{type}"))
-        res, serialization = self.__manager.show(type)
+        _, serialization = self.__manager.show(type)
         data = []
         if serialization.strip():
             rows = serialization.split("\n")
             for row in rows:
                 data.append(row.split(","))
+        res = True
         if res:
             error = ""
             if type == "sessions":
                 headers = ["ID", "User", "Remote host", "Platform"]
                 print("\n" + style.tabulate(headers, data) + "\n")
+                res = True
             elif type == "listeners":
                 headers = ["ID", "End point", "Expected platform"]
                 print("\n" + style.tabulate(headers, data) + "\n")
+                res = True
         return res, error
 
     def __get_prompt(self) -> str:

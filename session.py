@@ -102,7 +102,13 @@ class Session:
         while not self.__stop_evt.is_set():
             data = self.__chan.retrieve()
             if data:
-                print(data.decode("UTF-8"), end="")
+                try:
+                    print(data.decode("UTF-8"), end="")
+                except:
+                    try:
+                        print(data.decode("latin-1"), end="")
+                    except:
+                        pass
                 data = b""
             sys.stdout.flush()
 

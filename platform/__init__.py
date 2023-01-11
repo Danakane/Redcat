@@ -39,5 +39,8 @@ class Platform(abc.ABC):
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
         return b"echo " + start + b";" + payload + b";" + b"echo " + end + b"\n"
+
+    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+        return self.__chan.exec_transaction(buffer, start, end, handle_echo)
    
 

@@ -145,7 +145,7 @@ class Channel(abc.ABC):
                 # purge the command echo
                 while res and (end not in rdata):
                     res, resp = self.recv()
-                    rdata += resp
+                    rdata += resp 
                 resp = b""
                 rdata = utils.extract_data(rdata, end)
             while res and (not start_received):

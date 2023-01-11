@@ -22,19 +22,28 @@ class Linux(Platform):
         self.__got_pty: bool = False
         self.__interactive: bool = False
 
+    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+        self.channel.send(b"sh\n") 
+        res, data = self.channel.exec_transaction(buffer, start, end, handle_echo)
+        self.channel.send(b"exit\n")
+        self.channel.wait_data(0.5) # small timeout to receive and purge the prompt
+        time.sleep(0.1)
+        self.channel.purge()
+        return res, data
+
     def which(self, name: str) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"which {name}".encode(), self.channel, self, False).execute()
+        res, data = transaction.Transaction(f"which {name}".encode(), self, False).execute()
         return data.decode("utf-8")
 
     def id(self) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"id -u".encode(), self.channel, self, not self.__interactive).execute()
+        res, data = transaction.Transaction(f"id -u".encode(), self, not self.__interactive).execute()
         return data.decode("utf-8")
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
-        res, data = transaction.Transaction(f"whoami".encode(), self.channel, self, not self.__interactive).execute()
+        res, data = transaction.Transaction(f"whoami".encode(), self, not self.__interactive).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
@@ -44,8 +53,8 @@ class Linux(Platform):
         # The first head transaction result is corrupted with ansi escape characters for some reason
         # for now just do the transaction twice until I find better fix
         with self.channel.transaction_lock:
-            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, False).execute()
-            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self.channel, self, True).execute()
+            #res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, False).execute()
+            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
                 error = style.bold("can't find remote file ") + style.bold(style.red(f"{rfile}"))
@@ -56,7 +65,7 @@ class Linux(Platform):
                 res = False
                 error = style.bold("don't have permission to read remote file ") + style.bold(style.red(f"{rfile}"))
             else:
-                res, data = transaction.Transaction(f"base64 {rfile}".encode(), self.channel, self, True).execute()
+                res, data = transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
                 data = base64.b64decode(data)
         return res, error, data
 
@@ -80,8 +89,8 @@ class Linux(Platform):
             tmp_file = shlex.quote(tmp_file)
             # The first touch transaction result is corrupted with ansi escape characters for some reason
             # for now just do the transaction twice until I find better fix
-            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self.channel, self, False).execute()
-            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self.channel, self, True).execute()
+            #res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self, False).execute()
+            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
                 error = style.bold("can't find remote parent directory")
@@ -90,19 +99,19 @@ class Linux(Platform):
                 error = style.bold("don't have permission to write in remote parent directory")
             else:
                 style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
-                res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self.channel, self, False).execute()
+                res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
                 i = 1
                 style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 if length > 1:
                     for chunk in chunks[1:]:
                         i += 1
-                        res, _ = transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self.channel, self, False).execute()
+                        res, _ = transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
                         style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
                 rfile = shlex.quote(rfile)
-                res, _ = transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self.channel, self, False).execute()
-                res, _ = transaction.Transaction(f"rm {tmp_file}".encode(), self.channel, self, False).execute()
+                res, _ = transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, False).execute()
+                res, _ = transaction.Transaction(f"rm {tmp_file}".encode(), self, False).execute()
                 error = ""
         return res, error
 
@@ -164,7 +173,7 @@ class Linux(Platform):
                         ]
                     )
                 ).encode()
-                transaction.Transaction(payload, self.channel, self).execute()
+                transaction.Transaction(payload, self).execute()
                 self.channel.wait_data(0.5)
                 time.sleep(0.1)
                 self.channel.purge()

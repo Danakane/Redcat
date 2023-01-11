@@ -21,6 +21,6 @@ class Windows(Platform):
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
-        res, data = transaction.Transaction(f"whoami".encode(), self.channel, self, True).execute()
+        res, data = transaction.Transaction(f"whoami".encode(), self, True).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 

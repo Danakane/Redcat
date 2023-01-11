@@ -50,10 +50,7 @@ class Linux(Platform):
         res = False
         error = style.bold("Failed to download remote file ") + style.bold(style.red(f"{rfile}"))
         self.channel.purge()
-        # The first head transaction result is corrupted with ansi escape characters for some reason
-        # for now just do the transaction twice until I find better fix
         with self.channel.transaction_lock:
-            #res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, False).execute()
             res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
@@ -78,8 +75,7 @@ class Linux(Platform):
         n = 4096
         chunks = [encoded[i:i+n] for i in range(0, len(encoded), n)]
         # then for each chunk execute a transaction to write into a temporary file
-        # the lock is used for performance -> starve the session reader main loop
-        # Don't handle echo, it's less error prone and we don't care about the output anyway
+        # the lock is used for performance -> starve the session reader main loop 
         with self.channel.transaction_lock:
             length = len(chunks) 
             tmp_file = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_") + ".tmp"
@@ -87,9 +83,6 @@ class Linux(Platform):
             if parent:
                 tmp_file = f"{parent}/{tmp_file}"
             tmp_file = shlex.quote(tmp_file)
-            # The first touch transaction result is corrupted with ansi escape characters for some reason
-            # for now just do the transaction twice until I find better fix
-            #res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self, False).execute()
             res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
@@ -99,6 +92,7 @@ class Linux(Platform):
                 error = style.bold("don't have permission to write in remote parent directory")
             else:
                 style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                # Don't handle echo, it's less error prone and we don't care about the output anyway
                 res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
                 i = 1
                 style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)

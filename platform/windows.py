@@ -14,3 +14,8 @@ class Windows(Platform):
     def interactive(self, value: bool) -> bool:
         return value
 
+    def whoami(self) -> typing.Tuple[bool, str, str]:
+        self.channel.purge()
+        res, data = transaction.Transaction(f"whoami".encode(), self.channel, self, True).execute()
+        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
+

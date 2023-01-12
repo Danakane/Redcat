@@ -31,7 +31,7 @@ class Command:
     def exec(self, cmd_line: str) -> bool:
         res = False
         error = "invalid arguments"
-        splits = shlex.split(cmd_line)
+        splits = shlex.split(cmd_line, posix=False)
         name = splits[0]
         arguments = splits[1:]
         if name == self.__name:

@@ -158,7 +158,7 @@ class Engine:
         host = self.__manager.get_session_remote()
         if not host:
             host = "@localhost"
-        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green("pwncat")) + "🐈"
+        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green("pwncat")) + "🐈 "
         return prompt
 
     # -------------------------------------------------------------------------------------------#

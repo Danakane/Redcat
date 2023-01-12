@@ -62,6 +62,9 @@ class SystemCommand(Command):
                 cmd = args
         cmd = cmd.strip()
         if cmd:
-            subprocess.run(cmd, shell=True)
+            try:
+                subprocess.run(cmd, shell=True)
+            except KeyboardInterrupt:
+                pass
         return True, ""
 

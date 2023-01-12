@@ -175,7 +175,13 @@ class Manager:
             sess = self.__sessions[id]
             sess.interactive(True) 
             sess.start()
-            sess.wait_stop()
+            stopped = False
+            while not stopped:
+                try:
+                    stopped = sess.wait_stop()
+                except KeyboardInterrupt:
+                    # ignore keyboard interrupt for non raw mode shell like windows
+                    pass
             sess.interactive(False)
             print()
             res = True

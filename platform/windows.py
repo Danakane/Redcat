@@ -17,7 +17,7 @@ class Windows(Platform):
         return value
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
-        return b"echo " + start + b" && " + payload + b" && " + b"echo " + end + b"\n"
+        return b"echo " + start + b" & " + payload + b" & " + b"echo " + end + b"\n"
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
         self.channel.purge()

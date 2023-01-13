@@ -22,10 +22,6 @@ class Linux(Platform):
         self.__got_pty: bool = False
         self.__interactive: bool = False
 
-    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
-        res, data = self.channel.exec_transaction(buffer, start, end, handle_echo)
-        return res, data
-
     def which(self, name: str, handle_echo: bool=True) -> str:
         self.channel.purge()
         res, data = transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()

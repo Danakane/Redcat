@@ -143,7 +143,12 @@ class Linux(Platform):
     def interactive(self, value: bool) -> bool:
         res = False
         if value:
-            if self.__got_pty or self.get_pty():
+            if self.__got_pty and not self.__interactive:
+                # we already have pty but have been backgrounded
+                # call exit to leave sh shell that we called
+                # when we backgrounded the shell
+                self.channel.send(b"exit\n")
+            elif (not self.__got_pty) and self.get_pty():
                 best_shell = "sh"
                 better_shells = ["zsh", "bash", "ksh", "fish"]
                 for shell in better_shells:
@@ -152,28 +157,30 @@ class Linux(Platform):
                         best_shell = shell
                         break
                 self.channel.send(best_shell.encode() + b"\n")
-                tty.setraw(self.__stdin_fd)
-                term = os.environ.get("TERM", "xterm")
-                columns, rows = os.get_terminal_size(0) 
-                payload = (
-                    " ; ".join(
-                        [
-                            " stty sane",
-                            f" stty rows {rows} columns {columns}",
-                            f" export TERM='{term}'",
-                        ]
-                    )
-                ).encode()
-                transaction.Transaction(payload, self).execute()
-                self.channel.wait_data(0.5)
-                time.sleep(0.1)
-                self.channel.purge()
-                self.channel.send(b"\n")
-                res = True
+            tty.setraw(self.__stdin_fd)
+            term = os.environ.get("TERM", "xterm")
+            columns, rows = os.get_terminal_size(0) 
+            payload = (
+                " ; ".join(
+                    [
+                        " stty sane",
+                        f" stty rows {rows} columns {columns}",
+                        f" export TERM='{term}'",
+                    ]
+                )
+            ).encode()
+            transaction.Transaction(payload, self).execute()
+            self.channel.wait_data(0.5)
+            time.sleep(0.1)
+            self.channel.purge()
+            self.channel.send(b"\n")
+            res = True
         else:
             termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
             if self.channel.is_open:
-                self.channel.send(b"exit\n")
+                # use sh shell when backgrounded
+                # we can't just call exit because user may have called another shell
+                self.channel.send(b"sh\n")
                 time.sleep(0.1)
                 self.channel.purge()
         self.__interactive = res

@@ -137,18 +137,18 @@ class Engine:
         res, error, serialization = self.__manager.show(type)
         data = []
         if res:
-            if serialization.strip():
-                rows = serialization.split("\n")
-                for row in rows:
+            rows = serialization.split("\n")
+            for row in rows:
+                if row:
                     data.append(row.split(","))
-                if type == "sessions":
-                    headers = ["ID", "User", "Remote host", "Platform"]
-                    print("\n" + style.tabulate(headers, data) + "\n")
-                    res = True
-                elif type == "listeners":
-                    headers = ["ID", "End point", "Expected platform"]
-                    print("\n" + style.tabulate(headers, data) + "\n")
-                    res = True
+            if type == "sessions":
+                headers = ["ID", "User", "Remote host", "Platform"]
+                print("\n" + style.tabulate(headers, data) + "\n")
+                res = True
+            elif type == "listeners":
+                headers = ["ID", "End point", "Expected platform"]
+                print("\n" + style.tabulate(headers, data) + "\n")
+                res = True
         return res, error
 
     def __get_prompt(self) -> str:

@@ -122,8 +122,8 @@ class Manager:
 
     # kill a session or a listener
     def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
-        res = True
-        error = ""
+        res = False
+        error = style.bold("invalid parameter ") + style.bold(style.red(f"{type}"))
         if type == "session":
             with self.__lock_sessions:
                 if id in self.__sessions.keys():
@@ -131,11 +131,11 @@ class Manager:
                     sess.stop()
                     sess.close()
                     del self.__sessions[id]
+                    res = True
                     if id == self.__selected_id:
                         self.__selected_id = ""
                         self.__selected_session = None
                 else:
-                    res = False
                     error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
         elif type == "listener":
             thread = None
@@ -146,8 +146,8 @@ class Manager:
                     stop_event.set()
                     thread.join()
                     del self.__listeners[id]
+                    res = True
                 else:
-                    res = False
                     error = style.bold("unknown listener id ") + style.bold(style.red(f"{id}"))
         return res, error
 
@@ -188,8 +188,9 @@ class Manager:
             error = ""
         return res, error
 
-    def show(self, type: str) -> typing.Tuple[bool, str]:
+    def show(self, type: str) -> typing.Tuple[bool, str, str]:
         res = False
+        error = style.bold("invalid parameter ") + style.bold(style.red(f"{type}"))
         serializations = []
         if type == "sessions":
             res = True
@@ -200,7 +201,7 @@ class Manager:
             res = True
             for id, value in self.__listeners.items():
                 serializations.append(f"{id},@{value[2]}:{value[3]},{value[4]}")
-        return res, "\n".join(serializations)
+        return res, error, "\n".join(serializations)
 
     def get_session_remote(self, id: str = "") -> str:
         host = ""

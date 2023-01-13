@@ -23,27 +23,22 @@ class Linux(Platform):
         self.__interactive: bool = False
 
     def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
-        self.channel.send(b"sh\n") 
         res, data = self.channel.exec_transaction(buffer, start, end, handle_echo)
-        self.channel.send(b"exit\n")
-        self.channel.wait_data(0.5) # small timeout to receive and purge the prompt
-        time.sleep(0.1)
-        self.channel.purge()
         return res, data
 
-    def which(self, name: str) -> str:
+    def which(self, name: str, handle_echo: bool=True) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"which {name}".encode(), self, False).execute()
+        res, data = transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
         return data.decode("utf-8")
 
-    def id(self) -> str:
+    def id(self, handle_echo: bool=True) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"id -u".encode(), self, not self.__interactive).execute()
+        res, data = transaction.Transaction(f"id -u".encode(), self, handle_echo).execute()
         return data.decode("utf-8")
 
-    def whoami(self) -> typing.Tuple[bool, str, str]:
+    def whoami(self, handle_echo: bool=True) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
-        res, data = transaction.Transaction(f"whoami".encode(), self, not self.__interactive).execute()
+        res, data = transaction.Transaction(f"whoami".encode(), self, handle_echo).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
@@ -72,7 +67,7 @@ class Linux(Platform):
         self.channel.purge()
         encoded = base64.b64encode(data)
         # devide encoded data into chunks of 4096 bytes at most
-        n = 4096
+        n = 2048 # ash/dash shell severally limit the command line length
         chunks = [encoded[i:i+n] for i in range(0, len(encoded), n)]
         # then for each chunk execute a transaction to write into a temporary file
         # the lock is used for performance -> starve the session reader main loop 
@@ -112,12 +107,6 @@ class Linux(Platform):
     def get_pty(self) -> bool:
         got_pty: bool = False
         best_shell = "sh"
-        better_shells = ["zsh", "bash", "ksh", "fish"]
-        for shell in better_shells:
-            res = self.which(shell)
-            if shell in res:
-                best_shell = shell
-                break
         pty_options = [ 
             (["script"], "{binary_path} -qc {shell} /dev/null 2>&1\n"),
             (
@@ -137,7 +126,7 @@ class Linux(Platform):
         ]
         for binaries, payload_format in pty_options:
             for binary in binaries:
-                res = self.which(binary)
+                res = self.which(binary, False) # don't have pty yet, so no echo
                 if binary in res:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
                     self.channel.send(payload.encode())
@@ -155,6 +144,14 @@ class Linux(Platform):
         res = False
         if value:
             if self.__got_pty or self.get_pty():
+                best_shell = "sh"
+                better_shells = ["zsh", "bash", "ksh", "fish"]
+                for shell in better_shells:
+                    res = self.which(shell, True)
+                    if shell in res:
+                        best_shell = shell
+                        break
+                self.channel.send(best_shell.encode() + b"\n")
                 tty.setraw(self.__stdin_fd)
                 term = os.environ.get("TERM", "xterm")
                 columns, rows = os.get_terminal_size(0) 
@@ -175,6 +172,10 @@ class Linux(Platform):
                 res = True
         else:
             termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
+            if self.channel.is_open:
+                self.channel.send(b"exit\n")
+                time.sleep(0.1)
+                self.channel.purge()
         self.__interactive = res
         return self.__interactive
 

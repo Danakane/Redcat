@@ -2,7 +2,8 @@ import readline
 import shlex
 import typing
 import subprocess
-import signal
+import sys
+import os
 
 import style
 import command
@@ -90,19 +91,54 @@ class Engine:
             matches = [s for s in self.__keywords if s and s.startswith(buffer)]
             # return match indexed by state
             if state < len(matches):
-                res = matches[state]
+                res = matches[state] + " "
         elif len(words) == 2:
-            word = words[1]
+            word = words[-1]
             matches = []
             if words[0] == "help":
-                matches = [s for s in self.__keywords if s and s.startswith(word)]
+                matches = [s + " " for s in self.__keywords if s and s.startswith(word)]
             elif words[0] == "show":
-                matches = [s for s in ["sessions", "listeners"] if s and s.startswith(word)]
+                matches = [s + " " for s in ["sessions", "listeners"] if s and s.startswith(word)]
             elif words[0] == "kill":
-                matches = [s for s in ["session", "listener"] if s and s.startswith(word)]
+                matches = [s + " " for s in ["session", "listener"] if s and s.startswith(word)]
+            elif words[0] == "upload":
+                matches = self.__complete_local_path(word)
             if state < len(matches):
                 res = f"{words[0]} {matches[state]}"
+        elif len(words) == 3:
+            word = words[-1]
+            matches = []
+            if words[0] == "download":
+                matches = self.__complete_local_path(word)
+            if state < len(matches):
+                tmp = " ".join(words[:-1])
+                res = f"{tmp} {matches[state]}"
+        if len(words) > 1 and words[0] == "local":
+            word = words[-1]
+            matches = []
+            if words[0] == "local":
+                matches = self.__complete_local_path(word)
+            if state < len(matches):
+                tmp = " ".join(words[:-1])
+                res = f"{tmp} {matches[state]}"
         return res
+
+    def __complete_local_path(self, path: str) -> typing.List[str]:
+        dirname = os.path.dirname(path)
+        basename = os.path.basename(path)
+        if not dirname:
+            dirname = "."
+        items = os.listdir(dirname)
+        if dirname == "/":
+            dirname = ""
+        for i in range(len(items)):
+            item = f"{dirname}/{items[i]}"
+            if os.path.isdir(item):
+                items[i] = item + "/"
+            else:
+                items[i] = item + " "
+        matches = [item for item in items if item and item.startswith(path)]
+        return matches 
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:
         res = True

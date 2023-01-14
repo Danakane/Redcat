@@ -76,6 +76,33 @@ class Engine:
         # system command
         cmd_local = command.SystemCommand("local")
         self.__commands[cmd_local.name] = cmd_local
+        # for autocompletion
+        self.__keywords = sorted(self.__commands.keys())
+        readline.set_completer_delims("\t\n;")
+        readline.set_completer(self.__autocomplete)
+        readline.parse_and_bind('tab: complete')
+
+    def __autocomplete(self, text: str, state: int) -> str:
+        res = None
+        buffer = readline.get_line_buffer()
+        words = shlex.split(buffer)
+        if len(words) == 1:
+            matches = [s for s in self.__keywords if s and s.startswith(buffer)]
+            # return match indexed by state
+            if state < len(matches):
+                res = matches[state]
+        elif len(words) == 2:
+            word = words[1]
+            matches = []
+            if words[0] == "help":
+                matches = [s for s in self.__keywords if s and s.startswith(word)]
+            elif words[0] == "show":
+                matches = [s for s in ["sessions", "listeners"] if s and s.startswith(word)]
+            elif words[0] == "kill":
+                matches = [s for s in ["session", "listener"] if s and s.startswith(word)]
+            if state < len(matches):
+                res = f"{words[0]} {matches[state]}"
+        return res
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:
         res = True

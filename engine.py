@@ -85,8 +85,8 @@ class Engine:
         self.__matches = []
 
     def __autocomplete(self, text: str, state: int) -> str:
+        res = None
         if state == 0:
-            res = None
             buffer = readline.get_line_buffer()
             words = shlex.split(buffer)
             if len(words) == 1:

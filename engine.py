@@ -79,49 +79,57 @@ class Engine:
         self.__commands[cmd_local.name] = cmd_local
         # for autocompletion
         self.__keywords = sorted(self.__commands.keys())
-        readline.set_completer_delims("\t\n;")
+        readline.set_completer_delims(" \t\n;")
         readline.set_completer(self.__autocomplete)
         readline.parse_and_bind('tab: complete')
+        self.__matches = []
 
     def __autocomplete(self, text: str, state: int) -> str:
-        res = None
-        buffer = readline.get_line_buffer()
-        words = shlex.split(buffer)
-        if len(words) == 1:
-            matches = [s for s in self.__keywords if s and s.startswith(buffer)]
-            # return match indexed by state
-            if state < len(matches):
-                res = matches[state] + " "
-        elif len(words) == 2:
-            word = words[-1]
-            matches = []
-            if words[0] == "help":
-                matches = [s + " " for s in self.__keywords if s and s.startswith(word)]
-            elif words[0] == "show":
-                matches = [s + " " for s in ["sessions", "listeners"] if s and s.startswith(word)]
-            elif words[0] == "kill":
-                matches = [s + " " for s in ["session", "listener"] if s and s.startswith(word)]
-            elif words[0] == "upload":
-                matches = self.__complete_local_path(word)
-            if state < len(matches):
-                res = f"{words[0]} {matches[state]}"
-        elif len(words) == 3:
-            word = words[-1]
-            matches = []
-            if words[0] == "download":
-                matches = self.__complete_local_path(word)
-            if state < len(matches):
-                tmp = " ".join(words[:-1])
-                res = f"{tmp} {matches[state]}"
-        if len(words) > 1 and words[0] == "local":
-            word = words[-1]
-            matches = []
-            if words[0] == "local":
-                matches = self.__complete_local_path(word)
-            if state < len(matches):
-                tmp = " ".join(words[:-1])
-                res = f"{tmp} {matches[state]}"
+        if state == 0:
+            res = None
+            buffer = readline.get_line_buffer()
+            words = shlex.split(buffer)
+            if len(words) == 1:
+                matches = [s + " " for s in self.__keywords if (words[0] == "help" or text) and s and s.startswith(text)]
+            elif len(words) == 2:
+                word = words[-1]
+                matches = []
+                if words[0] == "help":
+                    matches = [f"{s} " for s in self.__keywords if text and s and s.startswith(word)]
+                elif words[0] == "show":
+                    matches = [f"{s} " for s in ["sessions", "listeners"] if text and s and s.startswith(word)]
+                elif words[0] == "kill":
+                    matches = [f"{s} " for s in ["session", "listener"] if text and s and s.startswith(word)]
+                elif words[0] == "upload":
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
+            elif len(words) == 3:
+                word = words[-1]
+                matches = []
+                if words[0] == "download":
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
+            if len(words) > 1 and words[0] == "local":
+                word = words[-1]
+                matches = []
+                if words[0] == "local":
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
+                    matches += [f"{s} " for s in self.__complete_pie(word) if text and s]
+            self.__matches = matches
+        if state < len(self.__matches):
+            res = self.__matches[state]
         return res
+
+    def __complete_pie(self, name: str) -> typing.List:
+        matches = []
+        dirs = os.getenv("PATH").split(":")
+        for directory in dirs:
+            if os.path.isdir(directory):
+                if directory[-1] != "/":
+                    directory += "/"
+                matches += [item for item in os.listdir(directory) if item and
+                          (os.path.isfile(f"{directory}{item}") or os.path.islink(f"{directory}{item}")) and
+                          item.startswith(name)]
+        matches = list(set(matches))
+        return matches
 
     def __complete_local_path(self, path: str) -> typing.List[str]:
         dirname = os.path.dirname(path)
@@ -129,10 +137,10 @@ class Engine:
         if not dirname:
             dirname = "."
         items = os.listdir(dirname)
-        if dirname == "/":
-            dirname = ""
+        if dirname[-1] != "/":
+            dirname += "/"
         for i in range(len(items)):
-            item = f"{dirname}/{items[i]}"
+            item = f"{dirname}{items[i]}"
             if os.path.isdir(item):
                 items[i] = item + "/"
             else:

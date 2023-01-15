@@ -134,10 +134,12 @@ class Engine:
     def __complete_local_path(self, path: str) -> typing.List[str]:
         dirname = os.path.dirname(path)
         basename = os.path.basename(path)
+        items = []
         if not dirname:
-            dirname = "."
-        items = os.listdir(dirname)
-        if dirname[-1] != "/":
+            items = os.listdir(".")
+        else:
+            items = os.listdir(dirname)
+        if dirname and dirname[-1] != "/":
             dirname += "/"
         for i in range(len(items)):
             item = f"{dirname}{items[i]}"

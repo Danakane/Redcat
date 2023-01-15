@@ -79,7 +79,7 @@ class Engine:
         self.__commands[cmd_local.name] = cmd_local
         # for autocompletion
         self.__keywords = sorted(self.__commands.keys())
-        readline.set_completer_delims("\t\n;")
+        readline.set_completer_delims(" \t\n;")
         readline.set_completer(self.__autocomplete)
         readline.parse_and_bind('tab: complete')
         self.__matches = []
@@ -90,31 +90,29 @@ class Engine:
             buffer = readline.get_line_buffer()
             words = shlex.split(buffer)
             if len(words) == 1:
-                matches = [s + " " for s in self.__keywords if s and s.startswith(buffer)]
+                matches = [s + " " for s in self.__keywords if (words[0] == "help" or text) and s and s.startswith(text)]
             elif len(words) == 2:
                 word = words[-1]
                 matches = []
                 if words[0] == "help":
-                    matches = [f"{words[0]} {s} " for s in self.__keywords if s and s.startswith(word)]
+                    matches = [f"{s} " for s in self.__keywords if text and s and s.startswith(word)]
                 elif words[0] == "show":
-                    matches = [f"{words[0]} {s} " for s in ["sessions", "listeners"] if s and s.startswith(word)]
+                    matches = [f"{s} " for s in ["sessions", "listeners"] if text and s and s.startswith(word)]
                 elif words[0] == "kill":
-                    matches = [f"{words[0]} {s} " for s in ["session", "listener"] if s and s.startswith(word)]
+                    matches = [f"{s} " for s in ["session", "listener"] if text and s and s.startswith(word)]
                 elif words[0] == "upload":
-                    matches = [f"{words[0]} {s}" for s in self.__complete_local_path(word)]
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
             elif len(words) == 3:
                 word = words[-1]
                 matches = []
                 if words[0] == "download":
-                    tmp = " ".join(words[:-1])
-                    matches = [f"{tmp} {s}" for s in self.__complete_local_path(word)]
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
             if len(words) > 1 and words[0] == "local":
                 word = words[-1]
                 matches = []
                 if words[0] == "local":
-                    tmp = " ".join(words[:-1])
-                    matches = [f"{tmp} {s}" for s in self.__complete_local_path(word)]
-                    matches += [f"{tmp} {s} " for s in self.__complete_pie(word)]
+                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
+                    matches += [f"{s} " for s in self.__complete_pie(word) if text and s]
             self.__matches = matches
         if state < len(self.__matches):
             res = self.__matches[state]

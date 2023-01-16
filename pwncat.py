@@ -36,7 +36,7 @@ if __name__ == "__main__":
             except KeyboardInterrupt:
                 res = False
         if res:
-            pwncat.run()
+            redcat.run()
         else:
             print(style.bold(style.red("[!] error:")) + f" {error}")
 

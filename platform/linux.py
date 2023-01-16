@@ -121,8 +121,8 @@ class Linux(Platform):
         ]
         for binaries, payload_format in pty_options:
             for binary in binaries:
-                res = self.which(binary, False) # don't have pty yet, so no echo
-                if res and not (f"which: no {binary} in" in res or "not found" in res) and binary in res:
+                resp = self.which(binary, False) # don't have pty yet, so no echo
+                if resp and not (f"which: no {binary} in" in resp or "not found" in resp) and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
                     self.channel.send(payload.encode())
                     got_pty = True
@@ -162,8 +162,8 @@ class Linux(Platform):
                 best_shell = "sh"
                 better_shells = ["zsh", "bash", "ksh", "fish"]
                 for shell in better_shells:
-                    res = self.which(shell, True)
-                    if res and not (f"which: no {shell} in" in res or "not found" in res) and shell in res:
+                    resp = self.which(shell, True)
+                    if resp and not (f"which: no {shell} in" in resp or "not found" in resp) and shell in resp:
                         best_shell = shell
                         break
                 self.channel.send(best_shell.encode() + b"\n") 

@@ -1,8 +1,8 @@
-import style
 import typing
 import abc
 from abc import abstractmethod
 
+import style
 import channel
 
 

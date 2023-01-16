@@ -69,6 +69,7 @@ class TcpChannel(channel.Channel):
         if self.is_open:
             print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}", end="")
             sys.stdout.flush()
+            sys.stdin.flush()
 
     def on_error(self) -> None:
         if self.__error:

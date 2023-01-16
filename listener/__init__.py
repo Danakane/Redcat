@@ -38,11 +38,13 @@ class Listener:
     def running(self) -> bool:
         return not self.__stop_evt.is_set()
 
-    def start(self) -> None:
+    def start(self) -> typing.Tuple[bool, str]:
         self.__stop_evt.clear()
-        self.on_start()
-        self.__thread = threading.Thread(target=self.__run)
-        self.__thread.start()
+        res, error = self.on_start()
+        if res:
+            self.__thread = threading.Thread(target=self.__run)
+            self.__thread.start()
+        return res, error
 
     def stop(self) -> None:
         self.__stop_evt.set()
@@ -56,14 +58,14 @@ class Listener:
             if chan and self.__callback:
                 self.__callback(self, chan, self.__platform_name)
 
-    def listen_once(self) -> typing.Tuple[channel.Channel, str]:
+    def listen_once(self) -> typing.Tuple[bool, str, channel.Channel, str]:
         chan: channel.Channel = None
-        self.on_start()
+        res, error = self.on_start()
         try:
             while not chan:
                 chan = self.listen()
         except KeyboardInterrupt:
             pass
         self.on_stop()
-        return chan, self.__platform_name
+        return res, error, chan, self.__platform_name
 

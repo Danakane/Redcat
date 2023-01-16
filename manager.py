@@ -62,7 +62,6 @@ class Manager:
                         self.__selected_id = id
                     sess.interactive(True) # getting pty immediately
                     sess.interactive(False)
-                    print()
                     break
         if not sender.running:
             if id == -1:
@@ -80,8 +79,8 @@ class Manager:
             id = -1
             new_listener = listener.factory.get_listener(addr, port, platform_name)
             try:
-                chan, platform_name = new_listener.listen_once()
-                if chan:
+                res, error, chan, platform_name = new_listener.listen_once()
+                if res and chan:
                     sess = session.Session(chan, platform_name=platform_name)
                     sess.open()
                     if sess.wait_open():
@@ -112,9 +111,7 @@ class Manager:
             with self.__lock_listeners:
                 self.__listeners[str(self.__listeners_last_id)] = new_listener
                 self.__listeners_last_id += 1
-            new_listener.start()
-            res = True
-            error = ""
+            res, error = new_listener.start()
         return res, error
 
     def connect(self, addr: str, port: int, platform_name: str = platform.LINUX) -> typing.Tuple[bool, str]:

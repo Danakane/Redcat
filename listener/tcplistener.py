@@ -24,17 +24,30 @@ class TcpListener(listener.Listener):
     def endpoint(self) -> str:
          return f"@{self.__endpoint[0]}:{self.__endpoint[1]}"
 
-    def on_start(self) -> None:
-        self.__sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
-        self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.__sock.bind(self.__endpoint)
-        self.__sock.listen(5)
+    def on_start(self) -> typing.Tuple[bool, str]:
+        res = False
+        error = "Failed to start the listener"
+        try:
+            self.__sock = socket.socket(self.__protocol, socket.SOCK_STREAM)
+            self.__sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.__sock.bind(self.__endpoint)
+            self.__sock.listen(5)
+            res = True
+            error = ""
+        except socket.error as err:
+            res = False
+            error = ": ".join([str(arg) for arg in err.args])
+        return res, error
 
     def on_stop(self) -> None:
         if self.__sock:
-            self.__sock.shutdown(socket.SHUT_RDWR)
-            self.__sock.close()
-            self.__sock = None
+            try:
+                self.__sock.shutdown(socket.SHUT_RDWR)
+                self.__sock.close()
+            except:
+                pass
+            finally:
+                self.__sock = None
 
     def listen(self) -> channel.Channel:
         chan = None

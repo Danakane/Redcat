@@ -11,9 +11,6 @@ import utils
 
 TCP: int = 0
 
-BIND: int = 0
-CONNECT: int = 1
-
 class ChannelState(enum.Enum):
     ERROR = -1
     CLOSED = 0

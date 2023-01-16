@@ -42,7 +42,7 @@ class Engine:
         cmd_listen.parser.add_argument("addr", type=str, nargs="?", help="address to bind")
         cmd_listen.parser.add_argument("port", type=int, nargs=1, help="port to bind on")
         cmd_listen.parser.add_argument("-m", "--platform", type=str, nargs=1, help="expected platform (linux or windows)")
-        cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the action in background")
+        cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
         self.__commands[cmd_listen.name] = cmd_listen
         # kill command
         cmd_kill = command.Command("kill", self.__manager.kill, "kill the session or listener for a given id")

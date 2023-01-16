@@ -60,11 +60,11 @@ class Channel(abc.ABC):
         pass
 
     @abstractmethod
-    def send(self, data: bytes) -> None:
+    def send(self, data: bytes) -> typing.Tuple[bool, str]:
         pass
 
     @abstractmethod
-    def recv(self) -> typing.Tuple[bool, bytes]:
+    def recv(self) -> typing.Tuple[bool, str, bytes]:
         pass
 
     @abstractmethod
@@ -72,7 +72,7 @@ class Channel(abc.ABC):
         pass
 
     @abstractmethod
-    def on_open(self) -> bool:
+    def on_open(self) -> typing.Tuple[bool, str]:
         pass
 
     @abstractmethod
@@ -83,11 +83,13 @@ class Channel(abc.ABC):
     def on_close(self) -> None:
         pass
 
-    def open(self) -> None:
+    def open(self) -> typing.Tuple[bool, str]:
         self.__state = ChannelState.OPENNING
-        self.on_open()
-        self.__thread = threading.Thread(target=self.__run)
-        self.__thread.start()
+        res, error = self.on_open()
+        if res:
+            self.__thread = threading.Thread(target=self.__run)
+            self.__thread.start()
+        return res, error
 
     def close(self) -> None:
         self.__state = ChannelState.CLOSING
@@ -96,9 +98,9 @@ class Channel(abc.ABC):
         self.__thread.join()
         self.__state = ChannelState.CLOSED
 
-    def error(self) -> None:
+    def error(self, err: str) -> None:
         self.__state = ChannelState.ERROR
-        self.on_error()
+        self.on_error(err)
 
     def collect(self, data: bytes) -> None:
         with self.__queue_lock:
@@ -137,25 +139,25 @@ class Channel(abc.ABC):
             if handle_echo:
                 # purge the command echo
                 while res and (end not in rdata):
-                    res, resp = self.recv()
+                    res, error, resp = self.recv()
                     rdata += resp
                 resp = b""
                 rdata = utils.extract_data(rdata, end)
             while res and (not start_received):
-                res, resp = self.recv()
+                res, error, resp = self.recv()
                 rdata += resp
                 if start in rdata:
                     start_received = True
             if end in rdata:
                 end_received = True
             while res and (not end_received):
-                res, resp = self.recv()
+                res, error, resp = self.recv()
                 rdata += resp
                 if end in rdata:
                     end_received = True
             resp = b"placeholder"
             while res and (len(resp) > 0): # clear remaining data in the channel
-                res, resp = self.recv()
+                res, error, resp = self.recv()
         if not res:
             rdata = b""
         else:
@@ -174,9 +176,9 @@ class Channel(abc.ABC):
         self.on_connection_established()
         while not self.__stop_evt.is_set():
             with self.__transaction_lock:
-                res, data = self.recv()
+                res, error, data = self.recv()
                 if not res:
-                    self.error()
+                    self.error(error)
                     self.__stop_evt.set()
                 else:
                     if data:

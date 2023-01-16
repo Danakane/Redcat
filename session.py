@@ -48,8 +48,8 @@ class Session:
     def is_interactive(self) -> bool:
         return self.__interactive
 
-    def open(self) -> None:
-        self.__chan.open()
+    def open(self) -> typing.Tuple[bool, str]:
+        return self.__chan.open()
 
     def close(self) -> None:
         self.__chan.close()
@@ -81,8 +81,8 @@ class Session:
             self.__thread_writer.join()
         self.__running = False
 
-    def send(self, data: bytes) -> None:
-        self.__chan.send(data)
+    def send(self, data: bytes) -> typing.Tuple[bool, str]:
+        return self.__chan.send(data)
 
     def wait_open(self, timeout: int=None) -> bool:
         return self.__chan.wait_open(timeout)
@@ -110,19 +110,19 @@ class Session:
 
     def __run_writer(self) -> None:
         self.__running = True
-        error = False
+        res = False
+        error = ""
         while not self.__stop_evt.is_set():
             byte = sys.stdin.buffer.read(1)
             if (not byte) or (byte == b"\x04"):
                 self.__stop_evt.set()
+                res = True
             else:
-                try:
-                    with self.__chan.transaction_lock:
-                        self.send(byte)
-                except Exception:
+                with self.__chan.transaction_lock:
+                    res, error = self.send(byte)
+                if not res:
                     self.__stop_evt.set()
-                    error = True
-        if error and self.__chan.is_open:
+        if (not res) and self.__chan.is_open:
             self.__chan.close()
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:

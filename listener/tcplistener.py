@@ -2,6 +2,7 @@ import select
 import socket
 import typing
 
+import style
 import utils
 import channel.factory
 import listener
@@ -36,7 +37,7 @@ class TcpListener(listener.Listener):
             error = ""
         except socket.error as err:
             res = False
-            error = ": ".join([str(arg) for arg in err.args])
+            error = style.bold(": ".join([str(arg) for arg in err.args]))
         return res, error
 
     def on_stop(self) -> None:

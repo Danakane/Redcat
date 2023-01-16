@@ -118,32 +118,35 @@ class Manager:
         res = False
         error = style.bold("failed to create session")
         sess = session.Session(addr=addr, port=port, platform_name=platform_name)
-        sess.open()
-        id = -1
-        try:
-            if sess.wait_open():
-                with self.__lock_sessions:
-                    id = str(self.__sessions_last_id)
-                    self.__sessions[id] = sess
-                    self.__sessions_last_id += 1
-                    if not self.__selected_session:
-                        self.__selected_session = sess
-                        self.__selected_id = id
-        except KeyboardInterrupt:
+        res, error = sess.open()
+        if res:
+            id = -1
+            try:
+                if sess.wait_open():
+                    with self.__lock_sessions:
+                        id = str(self.__sessions_last_id)
+                        self.__sessions[id] = sess
+                        self.__sessions_last_id += 1
+                        if not self.__selected_session:
+                            self.__selected_session = sess
+                            self.__selected_id = id
+            except KeyboardInterrupt:
+                res = False
+                error = style.bold("failed to create session")
+                if sess:
+                    sess.stop()
+                    sess.close()
+                    sess = None
+                    if id != -1 and id in self.__sessions.keys():
+                        del self.__sessions[id]
             if sess:
-                sess.stop()
-                sess.close()
-                sess = None
-                if id != -1 and id in self.__sessions.keys():
-                    del self.__sessions[id]
-        if sess:
-            sess.interactive(True) 
-            sess.start()
-            sess.wait_stop()
-            sess.interactive(False)
-            print()
-            res = True
-            error = ""
+                sess.interactive(True) 
+                sess.start()
+                sess.wait_stop()
+                sess.interactive(False)
+                print()
+                res = True
+                error = ""
         return res, error
 
     # kill a session or a listener

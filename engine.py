@@ -15,14 +15,15 @@ class Engine:
     #                                       Private section                                      #
     # -------------------------------------------------------------------------------------------#
     
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.__name: str = name
         self.__running: bool = False
         # sessions manager
         self.__manager: manager.Manager = manager.Manager()
         # commands
         self.__commands: typing.Dict[str, command.Command] = {}
         # exit command
-        cmd_exit = command.Command("exit", self.__exit, "exit pwncat")
+        cmd_exit = command.Command("exit", self.__exit, f"exit {self.__name}")
         self.__commands[cmd_exit.name] = cmd_exit
         # clear command
         cmd_clear = command.Command("clear", self.__clear, "clear the screen")
@@ -227,7 +228,7 @@ class Engine:
         host = self.__manager.get_session_remote()
         if not host:
             host = "@localhost"
-        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green("pwncat")) + "🐈 "
+        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green(self.__name)) + "🐈 "
         return prompt
 
     # -------------------------------------------------------------------------------------------#

@@ -17,8 +17,7 @@ class Linux(Platform):
 
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, LINUX)
-        self.__old_settings = termios.tcgetattr(sys.stdin.fileno())
-        self.__old_settings[3] |= termios.ECHO # force echo on old settings
+        self.__saved_settings = None
         self.__got_pty: bool = False
         self.__interactive: bool = False
 
@@ -123,7 +122,7 @@ class Linux(Platform):
         for binaries, payload_format in pty_options:
             for binary in binaries:
                 res = self.which(binary, False) # don't have pty yet, so no echo
-                if binary in res:
+                if res and not f"which: no {binary} in" in res and binary in res:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
                     self.channel.send(payload.encode())
                     got_pty = True
@@ -139,20 +138,8 @@ class Linux(Platform):
     def interactive(self, value: bool) -> bool:
         res = False
         if value:
-            if self.__got_pty and not self.__interactive:
-                # we already have pty but have been backgrounded
-                # call exit to leave sh shell that we called
-                # when we backgrounded the shell
-                self.channel.send(b"exit\n")
-            elif (not self.__got_pty) and self.get_pty():
-                best_shell = "sh"
-                better_shells = ["zsh", "bash", "ksh", "fish"]
-                for shell in better_shells:
-                    res = self.which(shell, True)
-                    if shell in res:
-                        best_shell = shell
-                        break
-                self.channel.send(best_shell.encode() + b"\n")
+            # save the terminal settings going in raw mode
+            self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
             tty.setraw(sys.stdin.fileno())
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
@@ -166,19 +153,37 @@ class Linux(Platform):
                 )
             ).encode()
             transaction.Transaction(payload, self).execute()
+            if self.__got_pty and not self.__interactive:
+                # we already have pty but have been backgrounded
+                # call exit to leave sh shell that we called
+                # when we backgrounded the shell
+                self.channel.send(b"exit\n")
+            elif (not self.__got_pty) and self.get_pty():
+                best_shell = "sh"
+                better_shells = ["zsh", "bash", "ksh", "fish"]
+                for shell in better_shells:
+                    res = self.which(shell, True)
+                    if res and not f"which: no {shell} in" in res and shell in res:
+                        best_shell = shell
+                        break
+                self.channel.send(best_shell.encode() + b"\n") 
             self.channel.wait_data(0.2)
             time.sleep(0.3)
             self.channel.purge()
             self.channel.send(b"\n")
             res = True
-        else:
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__old_settings)
+        else: 
+            # send ETX (CTRL+C) character to cancel any command that hasn't been entered
+            # before exiting console raw mode
+            self.channel.send(b"\x03")
+            # restore saved terminal settings
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
             if self.channel.is_open:
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell
                 self.channel.send(b"sh\n")
-                self.channel.wait_data(0.1)
-                time.sleep(0.1)
+                self.channel.wait_data(0.2)
+                time.sleep(0.3)
                 self.channel.purge()
         self.__interactive = res
         return self.__interactive

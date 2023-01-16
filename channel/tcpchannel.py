@@ -5,6 +5,7 @@ import select
 import threading
 import typing
 
+import style
 import utils
 import channel
 
@@ -32,8 +33,9 @@ class TcpChannel(channel.Channel):
             res = f"@{self.__remote[0]}:{self.__remote[1]}"
         return res
          
-    def connect(self) -> bool:
-        res: bool = True
+    def connect(self) -> typing.Tuple[bool, str]:
+        res = False
+        error = "Failed to create session"
         if not self.__sock:
             try:
                 protocol = socket.AF_INET
@@ -44,16 +46,17 @@ class TcpChannel(channel.Channel):
                 self.__sock = socket.socket(protocol, socket.SOCK_STREAM)
                 self.__sock.connect(endpoint)
                 self.__remote = endpoint
-            except OSError:
-                res = False
+                res = True
+                error = ""
             except Exception as err:
-                res = False
-                print(err.args)
-                self.__error = err.args[0]
-        return res
+                error = style.bold(": ".join(str(arg) for arg in err.args))
+        else:
+            res = True
+            error = ""
+        return res, error
 
-    def on_open(self) -> None:
-        self.connect()
+    def on_open(self) -> typing.Tuple[bool, str]:
+        return self.connect()
 
     def on_close(self) -> None:
         if self.__sock:
@@ -69,32 +72,41 @@ class TcpChannel(channel.Channel):
         if self.is_open:
             print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}", end="")
             sys.stdout.flush()
-            sys.stdin.flush()
 
-    def on_error(self) -> None:
-        if self.__error:
-            print(self.__error)
+    def on_error(self, error: str) -> None:
+        print(error)
 
-    def recv(self) -> typing.Tuple[bool, bytes]:
-        res = True
+    def recv(self) -> typing.Tuple[bool, str, bytes]:
+        res = False
+        error = ""
         data = b""
         try:
+            res = True
             readables, _, _= select.select([self.__sock], [], [], 0.05)
             if readables and readables[0] == self.__sock:
                 try:
                     data = self.__sock.recv(4096)
                 except IOError:
-                    pass # to avoid bad descriptor error
+                    res = True # to avoid bad descriptor error
                 except Exception as err:
-                    self.__error = err.args[1]
+                    error = style.bold(": ".join(str(arg) for arg in err.args))
                     res = False
         except select.error as err:
             res = False
-            self.__error = err.args[1]
-        return res, data
+            error =  ": ".join(str(arg) for arg in err.args)
+        return res, error, data
 
-    def send(self, data: bytes) -> None:
-        self.__sock.send(data)
+    def send(self, data: bytes) -> typing.Tuple[bool, str]:
+        res = False
+        error = ""
+        try:
+            self.__sock.send(data)
+            res = True
+            error = ""
+        except Exception as err:
+            error =  style.bold(": ".join(str(arg) for arg in err.args))
+        return res, error
+
 
     
 

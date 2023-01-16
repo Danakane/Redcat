@@ -61,11 +61,8 @@ class Listener:
     def listen_once(self) -> typing.Tuple[bool, str, channel.Channel, str]:
         chan: channel.Channel = None
         res, error = self.on_start()
-        try:
-            while not chan:
-                chan = self.listen()
-        except KeyboardInterrupt:
-            pass
+        while not chan:
+            chan = self.listen()
         self.on_stop()
         return res, error, chan, self.__platform_name
 

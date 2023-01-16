@@ -68,7 +68,7 @@ class Engine:
         cmd_download.parser.add_argument("id", type=str, nargs="?", help="id of the session")
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
-        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 10kb)")
+        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)")
         cmd_upload.parser.add_argument("lfile", type=str, nargs=1, help="local file to upload")
         cmd_upload.parser.add_argument("rfile", type=str, nargs=1, help="remote path for the uploaded file")
         cmd_upload.parser.add_argument("id", type=str, nargs="?", help="id of the session")

@@ -23,10 +23,10 @@ class ChannelState(enum.Enum):
 
 class Channel(abc.ABC):
 
-    def __init__(self, stop_evt: threading.Event) -> None:
+    def __init__(self) -> None:
         self.__thread: threading.Thread = None
         self.__state: int = ChannelState.CLOSED
-        self.__stop_evt: threading.Event = stop_evt
+        self.__stop_evt: threading.Event = threading.Event()
         self.__ready_evt: threading.Event = threading.Event()
         self.__has_data_evt: threading.Event() = threading.Event()
         self.__dataqueue: typing.Queue = queue.Queue()
@@ -62,11 +62,6 @@ class Channel(abc.ABC):
     def remote(self) -> str:
         pass
 
-    @property
-    @abstractmethod
-    def local(self) -> str:
-        pass
-    
     @abstractmethod
     def send(self, data: bytes) -> None:
         pass
@@ -80,7 +75,7 @@ class Channel(abc.ABC):
         pass
 
     @abstractmethod
-    def listen_or_connect(self) -> bool:
+    def on_open(self) -> bool:
         pass
 
     @abstractmethod
@@ -93,6 +88,7 @@ class Channel(abc.ABC):
 
     def open(self) -> None:
         self.__state = ChannelState.OPENNING
+        self.on_open()
         self.__thread = threading.Thread(target=self.__run)
         self.__thread.start()
 
@@ -176,26 +172,19 @@ class Channel(abc.ABC):
        return self.__has_data_evt.wait(timeout)
 
     def __run(self) -> None:
-        if self.listen_or_connect():
-            if self.__state == ChannelState.OPENNING:
-                self.__state = ChannelState.OPEN
-                self.__ready_evt.set()
-                self.on_connection_established()
-                while not self.__stop_evt.is_set():
-                    with self.__transaction_lock:
-                        res, data = self.recv()
-                        if not res:
-                            self.error()
-                            self.__stop_evt.set()
-                        else:
-                            if data:
-                                self.collect(data)
-                    time.sleep(0.05) # small delay to prevent transaction starvation
-            else:
-                self.__stop_evt.set()
-        else:
-            self.error()
-            self.__stop_evt.set()
+        self.__state = ChannelState.OPEN
+        self.__ready_evt.set()
+        self.on_connection_established()
+        while not self.__stop_evt.is_set():
+            with self.__transaction_lock:
+                res, data = self.recv()
+                if not res:
+                    self.error()
+                    self.__stop_evt.set()
+                else:
+                    if data:
+                        self.collect(data)
+            time.sleep(0.05) # small delay to prevent transaction starvation
 
     def __enter__(self):
         self.open()

@@ -36,7 +36,6 @@ class Engine:
         cmd_connect.parser.add_argument("addr", type=str, nargs=1, help="address to connect")
         cmd_connect.parser.add_argument("port", type=int, nargs=1, help="port to connect to")
         cmd_connect.parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
-        cmd_connect.parser.add_argument("-b", "--background", action="store_true", help="execute the action in background")
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
         cmd_listen = command.Command("listen", self.__listen, "listen for a reverse shell")
@@ -188,22 +187,22 @@ class Engine:
             error = ""
         return res, error
 
-    def __connect(self, addr: str, port: int, platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
+    def __connect(self, addr: str, port: int, platform: str = "") -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.create_session(addr, port, platform)
+            res, error = self.__manager.connect(addr, port, platform)
         else:
-            res, error = self.__manager.create_session(addr, port)
+            res, error = self.__manager.connect(addr, port)
         return res, error
 
     def __listen(self, port: int, addr: str = "", platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.create_session(addr, port, platform, True, background)
+            res, error = self.__manager.listen(addr, port, platform, background)
         else:
-            res, error = self.__manager.create_session(addr, port, bind=True, background=background)
+            res, error = self.__manager.listen(addr, port, background=background)
         return res, error
 
     def __show(self, type: str) -> typing.Tuple[bool, str]:

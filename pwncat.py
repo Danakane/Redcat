@@ -27,7 +27,7 @@ if __name__ == "__main__":
     with engine.Engine() as pwncat:
         if port:
             try:
-                pwncat.manager.create_session(addr, port, platform_name, bind)
+                pwncat.manager.listen(addr, port, platform_name)
             except KeyboardInterrupt:
                 interrupted = False
                 pass

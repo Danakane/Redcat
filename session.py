@@ -1,12 +1,6 @@
-import os
 import sys
-import select
-import socket
-import termios
 import threading
-import tty
 import typing
-import base64
 
 import channel, channel.factory
 import platform, platform.factory
@@ -15,11 +9,13 @@ import transaction
 
 class Session: 
 
-    def __init__(self, addr: str, port: int, channel_protocol:int=channel.TCP,
-                 mode:int=channel.BIND, platform_name: str=platform.LINUX) -> None:
+    def __init__(self, chan: channel.Channel = None, addr: str = None, port: int = None, channel_protocol:int=channel.TCP, platform_name: str=platform.LINUX) -> None:
         self.__chan: channel.Channel = None
         self.__platform: platform.Platform = None
-        self.__chan: channel.Channel = channel.factory.get_channel(addr, port, mode, channel_protocol)
+        if chan:
+            self.__chan = chan
+        else:
+            self.__chan: channel.Channel = channel.factory.get_channel(addr, port, channel_protocol)
         if self.__chan:
             self.__platform = platform.factory.get_platform(self.__chan, platform_name)
         self.__interactive: bool = False
@@ -123,10 +119,7 @@ class Session:
                 try:
                     with self.__chan.transaction_lock:
                         self.send(byte)
-                except socket.error:
-                    self.__stop_evt.set()
-                    error = True
-                except IOError:
+                except Exception:
                     self.__stop_evt.set()
                     error = True
         if error and self.__chan.is_open:

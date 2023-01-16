@@ -5,6 +5,7 @@ import shlex
 import style
 import channel
 import platform
+import listener, listener.factory
 import session
 
 
@@ -34,10 +35,8 @@ class Manager:
 
     def clear(self) -> None:
         # stop all listeners
-        for thread, stop_event, _, _, _ in self.__listeners.values():
-            stop_event.set()
-        for thread, stop_event, _, _, _ in self.__listeners.values():
-            thread.join()
+        for listen_endpoint in self.__listeners.values():
+            listen_endpoint.stop()
         with self.__lock_listeners:
             self.__listeners.clear()
         # stop and close all sessions
@@ -48,59 +47,58 @@ class Manager:
         with self.__lock_sessions:
             self.__sessions.clear()
 
-    # create a session
-    def __do_create_session(self, addr: str, port: int, platform_name: str, bind: bool, listener_id: str = "", stop_event: threading.Event = None) -> session.Session:
-        mode = channel.BIND if bind else channel.CONNECT
-        sess = session.Session(addr, port, mode=mode, platform_name=platform_name)
+    def __on_new_channel(self, sender: listener.Listener, chan: channel.Channel, platform_name: str) -> None:
+        sess = session.Session(chan, platform_name=platform_name)
         sess.open()
         id = -1
-        if stop_event:
-            while not stop_event.is_set():
-                if sess.wait_open(0.1):
-                    with self.__lock_sessions:
-                        id = str(self.__sessions_last_id)
-                        self.__sessions[id] = sess
-                        self.__sessions_last_id += 1
-                        if not self.__selected_session:
-                            self.__selected_session = sess
-                            self.__selected_id = id
-                        sess.interactive(True) # getting pty immediately
-                        sess.interactive(False)
-                        break
-            if stop_event.is_set():
-                sess.stop()
-                sess.close()
-                sess = None
-                if id != -1:
-                    with self.__lock_sessions:
-                        del self.__sessions[id]
-        else:
-            try:
-                if sess.wait_open():
-                    with self.__lock_sessions:
-                        id = str(self.__sessions_last_id)
-                        self.__sessions[id] = sess
-                        self.__sessions_last_id += 1
-                        if not self.__selected_session:
-                            self.__selected_session = sess
-                            self.__selected_id = id
-            except KeyboardInterrupt:
-                sess.stop()
-                sess.close()
-        if sess:
-            with self.__lock_listeners:
-                if listener_id in self.__listeners.keys():
-                    del self.__listeners[listener_id]
-        if sess and not sess.is_open:
-            sess = None
-        return sess
+        while sender.running:
+            if sess.wait_open(0.1):
+                with self.__lock_sessions:
+                    id = str(self.__sessions_last_id)
+                    self.__sessions[id] = sess
+                    self.__sessions_last_id += 1
+                    if not self.__selected_session:
+                        self.__selected_session = sess
+                        self.__selected_id = id
+                    sess.interactive(True) # getting pty immediately
+                    sess.interactive(False)
+                    print()
+                    break
+        if not sender.running:
+            if id == -1:
+                with self.__lock_sessions:
+                    sess.stop()
+                    sess.close()
+                    sess = None
 
-    def create_session(self, addr: str, port: int, platform_name: str = platform.LINUX, bind: bool = False, background: bool = False) -> typing.Tuple[bool, str]:
+    def listen(self, addr: str, port: int, platform_name: str = platform.LINUX, background: bool = False) -> typing.Tuple[bool, str]:
         res = False
         error = style.bold("failed to create session")
-        stop_event = threading.Event()
         if not background:
-            sess = self.__do_create_session(addr, port, platform_name, bind)
+            chan = None
+            sess = None
+            id = -1
+            new_listener = listener.factory.get_listener(addr, port, platform_name)
+            try:
+                chan, platform_name = new_listener.listen_once()
+                if chan:
+                    sess = session.Session(chan, platform_name=platform_name)
+                    sess.open()
+                    if sess.wait_open():
+                        with self.__lock_sessions:
+                            id = str(self.__sessions_last_id)
+                            self.__sessions[id] = sess
+                            self.__sessions_last_id += 1
+                            if not self.__selected_session:
+                                self.__selected_session = sess
+                                self.__selected_id = id
+            except KeyboardInterrupt:
+                if sess:
+                    sess.stop()
+                    sess.close()
+                    sess = None
+                    if id != -1 and id in self.__sessions.keys():
+                        del self.__sessions[id]
             if sess:
                 sess.interactive(True) 
                 sess.start()
@@ -110,14 +108,45 @@ class Manager:
                 res = True
                 error = ""
         else:
+            new_listener = listener.factory.get_listener(addr, port, platform_name, callback=self.__on_new_channel)
             with self.__lock_listeners:
-                stop_event = threading.Event()
-                thread = threading.Thread(target=self.__do_create_session, args = (addr, port, platform_name, bind, str(self.__listeners_last_id), stop_event))
-                self.__listeners[str(self.__listeners_last_id)] = (thread, stop_event, addr, port, platform_name)
-                thread.start()
+                self.__listeners[str(self.__listeners_last_id)] = new_listener
                 self.__listeners_last_id += 1
-                res = True
-                error = ""
+            new_listener.start()
+            res = True
+            error = ""
+        return res, error
+
+    def connect(self, addr: str, port: int, platform_name: str = platform.LINUX) -> typing.Tuple[bool, str]:
+        res = False
+        error = style.bold("failed to create session")
+        sess = session.Session(addr=addr, port=port, platform_name=platform_name)
+        sess.open()
+        id = -1
+        try:
+            if sess.wait_open():
+                with self.__lock_sessions:
+                    id = str(self.__sessions_last_id)
+                    self.__sessions[id] = sess
+                    self.__sessions_last_id += 1
+                    if not self.__selected_session:
+                        self.__selected_session = sess
+                        self.__selected_id = id
+        except KeyboardInterrupt:
+            if sess:
+                sess.stop()
+                sess.close()
+                sess = None
+                if id != -1 and id in self.__sessions.keys():
+                    del self.__sessions[id]
+        if sess:
+            sess.interactive(True) 
+            sess.start()
+            sess.wait_stop()
+            sess.interactive(False)
+            print()
+            res = True
+            error = ""
         return res, error
 
     # kill a session or a listener
@@ -138,13 +167,10 @@ class Manager:
                 else:
                     error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
         elif type == "listener":
-            thread = None
-            stop_event = None
             with self.__lock_listeners:
                 if id in self.__listeners.keys():
-                    thread, stop_event, _, _, _ = self.__listeners[id]
-                    stop_event.set()
-                    thread.join()
+                    listen_endpoint = self.__listeners[id]
+                    listen_endpoint.stop()
                     del self.__listeners[id]
                     res = True
                 else:
@@ -199,8 +225,8 @@ class Manager:
                 serializations.append(f"{id},{user},{sess.remote},{sess.platform_name}")
         elif type == "listeners":
             res = True
-            for id, value in self.__listeners.items():
-                serializations.append(f"{id},@{value[2]}:{value[3]},{value[4]}")
+            for id, listen_point in self.__listeners.items():
+                serializations.append(f"{id},{listen_point.endpoint},{listen_point.platform_name}")
         return res, error, "\n".join(serializations)
 
     def get_session_remote(self, id: str = "") -> str:

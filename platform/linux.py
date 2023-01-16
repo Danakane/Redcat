@@ -17,8 +17,8 @@ class Linux(Platform):
 
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, LINUX)
-        self.__stdin_fd = sys.stdin.fileno()
-        self.__old_settings = termios.tcgetattr(self.__stdin_fd)
+        self.__old_settings = termios.tcgetattr(sys.stdin)
+        #self.__old_settings[3] |= termios.ECHO # force echo on old settings
         self.__got_pty: bool = False
         self.__interactive: bool = False
 
@@ -153,7 +153,7 @@ class Linux(Platform):
                         best_shell = shell
                         break
                 self.channel.send(best_shell.encode() + b"\n")
-            tty.setraw(self.__stdin_fd)
+            tty.setraw(sys.stdin)
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
             payload = (
@@ -166,17 +166,19 @@ class Linux(Platform):
                 )
             ).encode()
             transaction.Transaction(payload, self).execute()
-            self.channel.wait_data(0.5)
-            time.sleep(0.1)
+            self.channel.wait_data(0.2)
+            time.sleep(0.5)
             self.channel.purge()
             self.channel.send(b"\n")
             res = True
         else:
-            termios.tcsetattr(self.__stdin_fd, termios.TCSADRAIN, self.__old_settings)
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.__old_settings)
+            print("OK")
             if self.channel.is_open:
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell
                 self.channel.send(b"sh\n")
+                self.channel.wait_data(0.1)
                 time.sleep(0.1)
                 self.channel.purge()
         self.__interactive = res

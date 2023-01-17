@@ -142,8 +142,9 @@ class Linux(Platform):
         res = False
         if value:
             # save the terminal settings going in raw mode
-            self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
-            tty.setraw(sys.stdin.fileno())
+            if not self.__interactive:
+                self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
+                tty.setraw(sys.stdin.fileno())
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
             payload = (
@@ -184,7 +185,8 @@ class Linux(Platform):
             # before exiting console raw mode
             res, _ = self.channel.send(b"\x03\n")
             # restore saved terminal settings
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
+            if self.__interactive:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
             if res and self.channel.is_open:
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell

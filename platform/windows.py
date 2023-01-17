@@ -23,7 +23,7 @@ class Windows(Platform):
 
     def interactive(self, value: bool) -> bool:
         self.__interactive = value
-        return value
+        return True
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
         return b"echo " + start + b" & " + payload + b" & " + b"echo " + end + b"\n"

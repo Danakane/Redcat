@@ -182,7 +182,7 @@ class Linux(Platform):
         else: 
             # send ETX (CTRL+C) character to cancel any command that hasn't been entered
             # before exiting console raw mode
-            res, _ = self.channel.send(b"\x03")
+            res, _ = self.channel.send(b"\x03\n")
             # restore saved terminal settings
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
             if res and self.channel.is_open:

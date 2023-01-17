@@ -1,8 +1,8 @@
-import style
 import typing
 import abc
 from abc import abstractmethod
 
+import style
 import channel
 
 
@@ -23,6 +23,11 @@ class Platform(abc.ABC):
     @property
     def channel(self) -> channel.Channel:
         return self.__chan
+
+    @property
+    @abstractmethod
+    def is_interactive(self) -> bool:
+        pass
 
     @abstractmethod
     def interactive(self, value: bool) -> bool:

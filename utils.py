@@ -1,3 +1,6 @@
+import socket
+import ipaddress
+
 
 def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) -> None:
     start_index = 0
@@ -13,3 +16,12 @@ def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) 
         else:
             extracted = raw[start_index+len(start):]
     return extracted
+
+def valid_ip_address(addr: str) -> int:
+    res: int = socket.AF_INET
+    try:
+        if type(ipaddress.ip_address(addr)) is ipaddress.IPv6Address:
+            res = socket.AF_INET6
+    except ValueError:
+        pass
+    return res

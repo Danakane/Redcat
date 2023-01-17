@@ -15,14 +15,15 @@ class Engine:
     #                                       Private section                                      #
     # -------------------------------------------------------------------------------------------#
     
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.__name: str = name
         self.__running: bool = False
         # sessions manager
         self.__manager: manager.Manager = manager.Manager()
         # commands
         self.__commands: typing.Dict[str, command.Command] = {}
         # exit command
-        cmd_exit = command.Command("exit", self.__exit, "exit pwncat")
+        cmd_exit = command.Command("exit", self.__exit, f"exit {self.__name}")
         self.__commands[cmd_exit.name] = cmd_exit
         # clear command
         cmd_clear = command.Command("clear", self.__clear, "clear the screen")
@@ -36,14 +37,13 @@ class Engine:
         cmd_connect.parser.add_argument("addr", type=str, nargs=1, help="address to connect")
         cmd_connect.parser.add_argument("port", type=int, nargs=1, help="port to connect to")
         cmd_connect.parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
-        cmd_connect.parser.add_argument("-b", "--background", action="store_true", help="execute the action in background")
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
         cmd_listen = command.Command("listen", self.__listen, "listen for a reverse shell")
         cmd_listen.parser.add_argument("addr", type=str, nargs="?", help="address to bind")
         cmd_listen.parser.add_argument("port", type=int, nargs=1, help="port to bind on")
         cmd_listen.parser.add_argument("-m", "--platform", type=str, nargs=1, help="expected platform (linux or windows)")
-        cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the action in background")
+        cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
         self.__commands[cmd_listen.name] = cmd_listen
         # kill command
         cmd_kill = command.Command("kill", self.__manager.kill, "kill the session or listener for a given id")
@@ -69,7 +69,7 @@ class Engine:
         cmd_download.parser.add_argument("id", type=str, nargs="?", help="id of the session")
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
-        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 10kb)")
+        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)")
         cmd_upload.parser.add_argument("lfile", type=str, nargs=1, help="local file to upload")
         cmd_upload.parser.add_argument("rfile", type=str, nargs=1, help="remote path for the uploaded file")
         cmd_upload.parser.add_argument("id", type=str, nargs="?", help="id of the session")
@@ -188,22 +188,22 @@ class Engine:
             error = ""
         return res, error
 
-    def __connect(self, addr: str, port: int, platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
+    def __connect(self, addr: str, port: int, platform: str = "") -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.create_session(addr, port, platform)
+            res, error = self.__manager.connect(addr, port, platform)
         else:
-            res, error = self.__manager.create_session(addr, port)
+            res, error = self.__manager.connect(addr, port)
         return res, error
 
     def __listen(self, port: int, addr: str = "", platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.create_session(addr, port, platform, True, background)
+            res, error = self.__manager.listen(addr, port, platform, background)
         else:
-            res, error = self.__manager.create_session(addr, port, bind=True, background=background)
+            res, error = self.__manager.listen(addr, port, background=background)
         return res, error
 
     def __show(self, type: str) -> typing.Tuple[bool, str]:
@@ -228,7 +228,7 @@ class Engine:
         host = self.__manager.get_session_remote()
         if not host:
             host = "@localhost"
-        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green("pwncat")) + "🐈 "
+        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green(self.__name)) + "🐈 "
         return prompt
 
     # -------------------------------------------------------------------------------------------#
@@ -240,6 +240,7 @@ class Engine:
         return self.__manager
 
     def run(self) -> None:
+        self.__manager.start()
         self.__running = True
         while self.__running:
             try:
@@ -249,7 +250,7 @@ class Engine:
                 if not res:
                     if not error:
                         error = "unspecified error"
-                    print(style.bold(style.red("[!] error:")) + f" {error}")
+                    print(style.bold(style.red("[!] error: ")) + error)
             except EOFError:
                 print()
                 if self.__manager.selected_id:
@@ -259,6 +260,7 @@ class Engine:
             except SystemExit:
                 print()
                 break
+        self.__manager.stop()
 
     def __enter__(self):
         return self

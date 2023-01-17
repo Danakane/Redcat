@@ -240,6 +240,7 @@ class Engine:
         return self.__manager
 
     def run(self) -> None:
+        self.__manager.start()
         self.__running = True
         while self.__running:
             try:
@@ -249,7 +250,7 @@ class Engine:
                 if not res:
                     if not error:
                         error = "unspecified error"
-                    print(style.bold(style.red("[!] error:")) + f" {error}")
+                    print(style.bold(style.red("[!] error: ")) + error)
             except EOFError:
                 print()
                 if self.__manager.selected_id:
@@ -259,6 +260,7 @@ class Engine:
             except SystemExit:
                 print()
                 break
+        self.__manager.stop()
 
     def __enter__(self):
         return self

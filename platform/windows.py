@@ -16,8 +16,13 @@ class Windows(Platform):
 
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, WINDOWS)
+        self.__interactive: bool = False
+
+    def is_interactive(self) -> bool:
+        return self.__interactive
 
     def interactive(self, value: bool) -> bool:
+        self.__interactive = value
         return value
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:

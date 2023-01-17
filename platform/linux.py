@@ -21,6 +21,10 @@ class Linux(Platform):
         self.__got_pty: bool = False
         self.__interactive: bool = False
 
+    @property
+    def is_interactive(self) -> bool:
+        return self.__interactive
+
     def which(self, name: str, handle_echo: bool=True) -> str:
         self.channel.purge()
         res, data = transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
@@ -124,8 +128,7 @@ class Linux(Platform):
                 resp = self.which(binary, False) # don't have pty yet, so no echo
                 if resp and not (f"which: no {binary} in" in resp or "not found" in resp) and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
-                    self.channel.send(payload.encode())
-                    got_pty = True
+                    got_pty, _ = self.channel.send(payload.encode())
                     break
             if got_pty:
                 self.__got_pty = got_pty
@@ -157,7 +160,7 @@ class Linux(Platform):
                 # we already have pty but have been backgrounded
                 # call exit to leave sh shell that we called
                 # when we backgrounded the shell
-                self.channel.send(b"exit\n")
+                res, _ = self.channel.send(b"exit\n")
             elif (not self.__got_pty) and self.get_pty():
                 best_shell = "sh"
                 better_shells = ["zsh", "bash", "ksh", "fish"]
@@ -166,26 +169,30 @@ class Linux(Platform):
                     if resp and not (f"which: no {shell} in" in resp or "not found" in resp) and shell in resp:
                         best_shell = shell
                         break
-                self.channel.send(best_shell.encode() + b"\n") 
-            self.channel.wait_data(0.2)
-            time.sleep(0.3)
-            self.channel.purge()
-            self.channel.send(b"\n")
-            res = True
-        else: 
-            # send ETX (CTRL+C) character to cancel any command that hasn't been entered
-            # before exiting console raw mode
-            self.channel.send(b"\x03")
-            # restore saved terminal settings
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
-            if self.channel.is_open:
-                # use sh shell when backgrounded
-                # we can't just call exit because user may have called another shell
-                self.channel.send(b"sh\n")
+                res, _ = self.channel.send(best_shell.encode() + b"\n") 
+            if res:
                 self.channel.wait_data(0.2)
                 time.sleep(0.3)
                 self.channel.purge()
-        self.__interactive = res
-        return self.__interactive
+                res, _ = self.channel.send(b"\n")
+            if res:
+                self.__interactive = True
+            else:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
+        else: 
+            # send ETX (CTRL+C) character to cancel any command that hasn't been entered
+            # before exiting console raw mode
+            res, _ = self.channel.send(b"\x03")
+            # restore saved terminal settings
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
+            if res and self.channel.is_open:
+                # use sh shell when backgrounded
+                # we can't just call exit because user may have called another shell
+                res, _ = self.channel.send(b"sh\n")
+                self.channel.wait_data(0.2)
+                time.sleep(0.3)
+                self.channel.purge()
+            self.__interactive = False
+        return res
 
 

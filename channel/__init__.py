@@ -29,6 +29,7 @@ class Channel(abc.ABC):
         self.__dataqueue: typing.Queue = queue.Queue()
         self.__queue_lock: threading.Lock = threading.Lock()
         self.__transaction_lock: threading.RLock = threading.RLock()
+        self.__error_callback: typing.Callable = None
 
     @property
     def is_open(self) -> bool:
@@ -53,6 +54,14 @@ class Channel(abc.ABC):
     @property
     def transaction_lock(self) -> threading.RLock:
         return self.__transaction_lock
+
+    @property
+    def error_callback(self) -> typing.Callable:
+        return self.__error_callback
+
+    @error_callback.setter
+    def error_callback(self, callback: typing.Callable) -> None:
+        self.__error_callback = callback
 
     @property
     @abstractmethod
@@ -101,6 +110,7 @@ class Channel(abc.ABC):
     def error(self, err: str) -> None:
         self.__state = ChannelState.ERROR
         self.on_error(err)
+        self.__error_callback(self, err)
 
     def collect(self, data: bytes) -> None:
         with self.__queue_lock:
@@ -131,7 +141,7 @@ class Channel(abc.ABC):
         res = True
         rdata = b""
         with self.__transaction_lock:
-            self.send(data)
+            res, error = self.send(data)
             rdata = b""
             resp = b""
             start_received = False

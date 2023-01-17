@@ -74,26 +74,30 @@ class TcpChannel(channel.Channel):
             sys.stdout.flush()
 
     def on_error(self, error: str) -> None:
-        print(error)
+        pass
 
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         res = False
         error = ""
         data = b""
-        try:
-            res = True
-            readables, _, _= select.select([self.__sock], [], [], 0.05)
-            if readables and readables[0] == self.__sock:
-                try:
-                    data = self.__sock.recv(4096)
-                except IOError:
-                    res = True # to avoid bad descriptor error
-                except Exception as err:
-                    error = style.bold(": ".join(str(arg) for arg in err.args))
-                    res = False
-        except select.error as err:
-            res = False
-            error =  ": ".join(str(arg) for arg in err.args)
+        if self.is_open:
+            try:
+                res = True
+                readables, _, _= select.select([self.__sock], [], [], 0.05)
+                if readables and readables[0] == self.__sock:
+                    try:
+                        data = self.__sock.recv(4096)
+                        if len(data) == 0:
+                            res = False
+                            error = style.bold(f"Connection with remote @{self.__remote[0]}:{self.__remote[1]} broken")
+                    except IOError:
+                        res = True # to avoid bad descriptor error
+                    except Exception as err:
+                        error = style.bold(": ".join(str(arg) for arg in err.args))
+                        res = False
+            except select.error as err:
+                res = False
+                error =  ": ".join(str(arg) for arg in err.args)
         return res, error, data
 
     def send(self, data: bytes) -> typing.Tuple[bool, str]:

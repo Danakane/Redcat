@@ -24,6 +24,11 @@ class Platform(abc.ABC):
     def channel(self) -> channel.Channel:
         return self.__chan
 
+    @property
+    @abstractmethod
+    def is_interactive(self) -> bool:
+        pass
+
     @abstractmethod
     def interactive(self, value: bool) -> bool:
         pass

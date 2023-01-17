@@ -1,3 +1,4 @@
+import time
 import typing
 import threading
 import shlex
@@ -14,12 +15,16 @@ class Manager:
     def __init__(self) -> None:
         self.__lock_sessions: threading.Lock = threading.Lock()
         self.__sessions: typing.Dict[str, session.Session] = {}
+        self.__lock_broken_sessions: threading.Lock = threading.Lock()
+        self.__broken_sessions: typing.List[str] = []
         self.__selected_id: str = ""
         self.__selected_session: session.Session = None
         self.__sessions_last_id: int = 0
         self.__lock_listeners: threading.Lock = threading.Lock()
         self.__listeners: typing.Dict[str, typing.Tuple(threading.Thread, threading.Event)] = {}
         self.__listeners_last_id: int = 0
+        self.__garbage_collector: threading.Thread = None
+        self.__stop_evt: threading.Event = threading.Event()
 
     @property
     def sessions(self) -> typing.Dict[str, session.Session]:
@@ -32,6 +37,18 @@ class Manager:
     @property
     def selected_session(self) -> session.Session:
         return self.__selected_session
+
+    def start(self) -> None:
+        if not self.__garbage_collector:
+            self.__stop_evt.clear()
+            self.__garbage_collector = threading.Thread(target=self.__clean_broken_sessions)
+            self.__garbage_collector.start()
+
+    def stop(self) -> None:
+        if self.__garbage_collector:
+            self.__stop_evt.set()
+            self.__garbage_collector.join()
+            self.__garbage_collector = None
 
     def clear(self) -> None:
         # stop all listeners
@@ -47,8 +64,17 @@ class Manager:
         with self.__lock_sessions:
             self.__sessions.clear()
 
+    def __clean_broken_sessions(self) -> None:
+        while not self.__stop_evt.is_set():
+            with self.__lock_broken_sessions:
+                if len(self.__broken_sessions) > 0:
+                    for id in self.__broken_sessions:
+                        self.kill("session", id)
+                self.__broken_sessions.clear()
+            time.sleep(0.1)
+
     def __on_new_channel(self, sender: listener.Listener, chan: channel.Channel, platform_name: str) -> None:
-        sess = session.Session(chan, platform_name=platform_name)
+        sess = session.Session(self.on_error, chan, platform_name=platform_name)
         sess.open()
         id = -1
         while sender.running:
@@ -81,7 +107,7 @@ class Manager:
             try:
                 res, error, chan, platform_name = new_listener.listen_once()
                 if res and chan:
-                    sess = session.Session(chan, platform_name=platform_name)
+                    sess = session.Session(self.on_error, chan, platform_name=platform_name)
                     sess.open()
                     if sess.wait_open():
                         with self.__lock_sessions:
@@ -117,7 +143,7 @@ class Manager:
     def connect(self, addr: str, port: int, platform_name: str = platform.LINUX) -> typing.Tuple[bool, str]:
         res = False
         error = style.bold("failed to create session")
-        sess = session.Session(addr=addr, port=port, platform_name=platform_name)
+        sess = session.Session(self.on_error, addr=addr, port=port, platform_name=platform_name)
         res, error = sess.open()
         if res:
             id = -1
@@ -199,19 +225,22 @@ class Manager:
         error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
         if id in self.__sessions.keys():
             sess = self.__sessions[id]
-            sess.interactive(True) 
-            sess.start()
-            stopped = False
-            while not stopped:
-                try:
-                    stopped = sess.wait_stop()
-                except KeyboardInterrupt:
-                    # ignore keyboard interrupt for non raw mode shell like windows
-                    pass
-            sess.interactive(False)
-            print()
-            res = True
-            error = ""
+            if sess.is_open:
+                sess.interactive(True) 
+                sess.start()
+                stopped = False
+                while not stopped:
+                    try:
+                        stopped = sess.wait_stop()
+                    except KeyboardInterrupt:
+                        # ignore keyboard interrupt for non raw mode shell like windows
+                        pass
+                sess.interactive(False)
+                print()
+                res = True
+                error = ""
+            else:
+                error = style.bold("session " + style.red(id) + " is broken")
         return res, error
 
     def show(self, type: str) -> typing.Tuple[bool, str, str]:
@@ -290,5 +319,18 @@ class Manager:
             else:
                 error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
         return res, error
+
+    def on_error(self, obj: typing.Any, error: str) -> None:
+        obj_id = -1
+        print(style.bold(style.red("[!] error: ") + error))
+        with self.__lock_sessions:
+            for id, sess in self.__sessions.items():
+                if sess == obj:
+                    obj_id = id
+                    break
+        if obj_id != -1:
+            with self.__lock_broken_sessions:
+                self.__broken_sessions.append(obj_id)
+
 
 

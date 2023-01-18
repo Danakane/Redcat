@@ -1,3 +1,4 @@
+import argparse
 import readline
 import shlex
 import typing
@@ -28,31 +29,27 @@ class Engine:
         # clear command
         cmd_clear = command.Command("clear", self.__clear, "clear the screen")
         self.__commands[cmd_clear.name] = cmd_clear
-        # help command
-        cmd_help = command.Command("help", self.__help, "help")
-        cmd_help.parser.add_argument("name", type=str, nargs="?", help="name of the command to display")
-        self.__commands[cmd_help.name] = cmd_help
         # connect command
         cmd_connect = command.Command("connect", self.__connect, "connect to a remote bind shell")
-        cmd_connect.parser.add_argument("addr", type=str, nargs=1, help="address to connect")
-        cmd_connect.parser.add_argument("port", type=int, nargs=1, help="port to connect to")
-        cmd_connect.parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
+        cmd_connect.add_argument("addr", type=str, nargs=1, help="address to connect")
+        cmd_connect.add_argument("port", type=int, nargs=1, help="port to connect to")
+        cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
         cmd_listen = command.Command("listen", self.__listen, "listen for a reverse shell")
-        cmd_listen.parser.add_argument("addr", type=str, nargs="?", help="address to bind")
-        cmd_listen.parser.add_argument("port", type=int, nargs=1, help="port to bind on")
-        cmd_listen.parser.add_argument("-m", "--platform", type=str, nargs=1, help="expected platform (linux or windows)")
-        cmd_listen.parser.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
+        cmd_listen.add_argument("addr", type=str, nargs="?", help="address to bind")
+        cmd_listen.add_argument("port", type=int, nargs=1, help="port to bind on")
+        cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
+        cmd_listen.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
         self.__commands[cmd_listen.name] = cmd_listen
         # kill command
         cmd_kill = command.Command("kill", self.__manager.kill, "kill the session or listener for a given id")
-        cmd_kill.parser.add_argument("type", type=str, nargs=1, help="type of object to kill: session or listener")
+        cmd_kill.add_argument("type", type=str, nargs=1, choices=["session", "listener"], help="type of object to kill")
         cmd_kill.parser.add_argument("id", type=str, nargs=1, help="id of object to kill")
         self.__commands[cmd_kill.name] = cmd_kill
         # show command
         cmd_show = command.Command("show", self.__show, "show available sessions or listeners")
-        cmd_show.parser.add_argument("type", type=str, nargs=1, help="type of the objects to display: sessions or listeners")
+        cmd_show.add_argument("type", type=str, nargs=1, choices=["sessions", "listeners"], help="the objects to display")
         self.__commands[cmd_show.name] = cmd_show
         # select session command
         cmd_session = command.Command("session", self.__manager.select_session, "select the session for a given id (-1 to unselect)")
@@ -63,62 +60,60 @@ class Engine:
         cmd_shell.parser.add_argument("id", type=str, nargs="?", help="id of session to spawn")
         self.__commands[cmd_shell.name] = cmd_shell
         # download command
-        cmd_download = command.Command("download", self.__manager.download, "download a file from remote host for a given session id")
+        cmd_download = command.Command("download", self.__manager.download, "download a file from remote host for a given session id", self.__on_download_command_completion)
         cmd_download.parser.add_argument("rfile", type=str, nargs=1, help="remote file to download")
         cmd_download.parser.add_argument("lfile", type=str, nargs=1, help="local path for the downloaded file")
         cmd_download.parser.add_argument("id", type=str, nargs="?", help="id of the session")
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
-        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)")
+        cmd_upload = command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)",
+                                     self.__on_upload_command_completion)
         cmd_upload.parser.add_argument("lfile", type=str, nargs=1, help="local file to upload")
         cmd_upload.parser.add_argument("rfile", type=str, nargs=1, help="remote path for the uploaded file")
         cmd_upload.parser.add_argument("id", type=str, nargs="?", help="id of the session")
         self.__commands[cmd_upload.name] = cmd_upload
-        # system command
-        cmd_local = command.SystemCommand("local")
+        # local command
+        cmd_local = command.Command("local", self.__system, "run the command in a local shell", self.__on_local_command_completion) 
+        cmd_local.add_argument("args", nargs=argparse.REMAINDER)
         self.__commands[cmd_local.name] = cmd_local
+        # help command
+        cmd_help = command.Command("help", self.__help, "list commands or display the help for a given command")
+        help_choices = ["help"] + [cmd_name for cmd_name in self.__commands.keys()]
+        cmd_help.add_argument("name", type=str, nargs="?", choices=help_choices, help="name of the command to display")
+        self.__commands[cmd_help.name] = cmd_help
         # for autocompletion
-        self.__keywords = sorted(self.__commands.keys())
         readline.set_completer_delims(" \t\n;")
         readline.set_completer(self.__autocomplete)
         readline.parse_and_bind('tab: complete')
-        self.__matches = []
+        self.__matches: typing.List[str] = []
 
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
         if state == 0:
+            matches = []
             buffer = readline.get_line_buffer()
-            words = shlex.split(buffer)
+            words = shlex.split(buffer, posix=False)
             if len(words) == 1:
-                matches = [s + " " for s in self.__keywords if (words[0] == "help" or text) and s and s.startswith(text)]
-            elif len(words) == 2:
-                word = words[-1]
+                if buffer:
+                    if text:
+                        if text in self.__commands.keys():
+                            if buffer[-1] != " ":
+                                readline.insert_text(" ") 
+                        else:
+                            matches = [s + " " for s in self.__commands.keys() if text and s and s.startswith(text)]
+                    else:
+                        matches = self.__commands[words[0]].complete(buffer, "")
+            elif len(words) > 1:
+                cmd_name = words[0]
                 matches = []
-                if words[0] == "help":
-                    matches = [f"{s} " for s in self.__keywords if text and s and s.startswith(word)]
-                elif words[0] == "show":
-                    matches = [f"{s} " for s in ["sessions", "listeners"] if text and s and s.startswith(word)]
-                elif words[0] == "kill":
-                    matches = [f"{s} " for s in ["session", "listener"] if text and s and s.startswith(word)]
-                elif words[0] == "upload":
-                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
-            elif len(words) == 3:
-                word = words[-1]
-                matches = []
-                if words[0] == "download":
-                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
-            if len(words) > 1 and words[0] == "local":
-                word = words[-1]
-                matches = []
-                if words[0] == "local":
-                    matches = [f"{s}" for s in self.__complete_local_path(word) if text and s]
-                    matches += [f"{s} " for s in self.__complete_pie(word) if text and s]
+                if cmd_name in self.__commands.keys():
+                    matches = self.__commands[cmd_name].complete(buffer, text)
             self.__matches = matches
         if state < len(self.__matches):
             res = self.__matches[state]
         return res
 
-    def __complete_pie(self, name: str) -> typing.List:
+    def __complete_pie(self, name: str) -> typing.List[str]:
         matches = []
         dirs = os.getenv("PATH").split(":")
         for directory in dirs:
@@ -148,7 +143,26 @@ class Engine:
             else:
                 items[i] = item + " "
         matches = [item for item in items if item and item.startswith(path)]
-        return matches 
+        return matches
+
+    def __on_upload_command_completion(self, buffer, text) -> typing.List[str]:
+        matches = []
+        words = shlex.split(buffer)
+        if (len(words) == 1 and text == "") or (len(words) == 2 and text == words[1]):
+            matches = [f"{s}" for s in self.__complete_local_path(text) if s]
+        return matches
+
+    def __on_download_command_completion(self, buffer, text) -> typing.List[str]:
+        matches = []
+        words = shlex.split(buffer)
+        if (len(words) == 2 and text == "") or len(words) == 3 and text == words[2]:
+            matches = [f"{s}" for s in self.__complete_local_path(text) if s]
+        return matches
+
+    def __on_local_command_completion(self, buffer, text) -> typing.List[str]:
+        matches = [f"{s}" for s in self.__complete_local_path(text) if s]
+        matches += [f"{s} " for s in self.__complete_pie(text) if s]
+        return matches
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:
         res = True
@@ -160,6 +174,23 @@ class Engine:
             if name in self.__commands.keys():
                 res, error = self.__commands[name].exec(cmd)
         return res, error
+
+    def __system(self, args):
+        cmd = ""
+        if args:
+            if isinstance(args, list) and len(args) > 1:
+                cmd = " ".join(args)
+            elif isinstance(args, list) and len(args) == 1:
+                cmd = args[0]
+            else:
+                cmd = args
+        cmd = cmd.strip()
+        if cmd:
+            try:
+                subprocess.run(cmd, shell=True)
+            except KeyboardInterrupt:
+                pass
+        return True, ""
 
     def __exit(self) -> typing.Tuple[bool, str]:
         self.__running = False

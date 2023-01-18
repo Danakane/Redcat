@@ -159,9 +159,11 @@ class Engine:
             matches = [f"{s}" for s in self.__complete_local_path(text) if s]
         return matches
 
-    def __on_local_command_completion(self, buffer, text) -> typing.List[str]:
-        matches = [f"{s}" for s in self.__complete_local_path(text) if s]
-        matches += [f"{s} " for s in self.__complete_pie(text) if s]
+    def __on_local_command_completion(self, buffer, text) -> typing.List[str]: 
+        matches = []
+        if text:
+            matches += [f"{s} " for s in self.__complete_pie(text) if s]
+        matches += [f"{s}" for s in self.__complete_local_path(text) if s]
         return matches
 
     def __call(self, cmd: str) -> typing.Tuple[bool, str]:

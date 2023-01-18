@@ -105,6 +105,8 @@ class Linux(Platform):
 
     def get_pty(self) -> bool:
         got_pty: bool = False
+        res, _ = self.channel.send(b"set +o history\n")
+        time.sleep(0.1)
         best_shell = "sh"
         pty_options = [ 
             (["script"], "{binary_path} -qc {shell} /dev/null 2>&1\n"),
@@ -128,7 +130,8 @@ class Linux(Platform):
                 resp = self.which(binary, False) # don't have pty yet, so no echo
                 if resp and not (f"which: no {binary} in" in resp or "not found" in resp) and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
-                    got_pty, _ = self.channel.send(payload.encode())
+                    got_pty, _ = self.channel.send(payload.encode()) 
+                    
                     break
             if got_pty:
                 self.__got_pty = got_pty
@@ -145,6 +148,8 @@ class Linux(Platform):
             if not self.__interactive:
                 self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
                 tty.setraw(sys.stdin.fileno())
+            res, _ = self.channel.send(b"set +o history\n")
+            time.sleep(0.1)
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
             payload = (
@@ -171,9 +176,11 @@ class Linux(Platform):
                         best_shell = shell
                         break
                 res, _ = self.channel.send(best_shell.encode() + b"\n") 
+                time.sleep(0.1)
+                res, _ = self.channel.send(b"set +o history\n")
             if res:
                 self.channel.wait_data(0.2)
-                time.sleep(0.3)
+                time.sleep(0.2)
                 self.channel.purge()
                 res, _ = self.channel.send(b"\n")
             if res:
@@ -191,8 +198,10 @@ class Linux(Platform):
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell
                 res, _ = self.channel.send(b"sh\n")
+                time.sleep(0.1)
+                res, _ = self.channel.send(b"set +o history\n")
                 self.channel.wait_data(0.2)
-                time.sleep(0.3)
+                time.sleep(0.2)
                 self.channel.purge()
             self.__interactive = False
         return res

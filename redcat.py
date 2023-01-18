@@ -10,7 +10,7 @@ import engine
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "redcat: a netcat on steroid for CTFs, pentests and red team exercises")
     parser.add_argument("-l", "--bind", action="store_true", help="use bind mode")
-    parser.add_argument("-m", "--platform-name", type=str, nargs=1, help="expected platform (linux or windows)")
+    parser.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform")
     parser.add_argument("-a", "--addr", type=str, nargs=1, help="address to bind or to connect")
     parser.add_argument("-p", "--port", type=int, nargs=1, help="port to bind or to connect")
     args = parser.parse_args()
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     if args.port and args.port[0]:
         port = args.port[0]
     platform_name = platform.LINUX
-    if args.platform_name and args.platform_name[0] and args.platform_name[0].lower() == platform.WINDOWS:
+    if args.platform and args.platform[0] and args.platform[0].lower() == platform.WINDOWS:
         platform_name = args.platform[0]
     res = True
     error = ""

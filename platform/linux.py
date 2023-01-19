@@ -155,7 +155,6 @@ class Linux(Platform):
                 self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
                 tty.setraw(sys.stdin.fileno())
             res, _ = self.send_cmd("set +o history")
-            time.sleep(0.1)
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
             payload = (
@@ -166,7 +165,7 @@ class Linux(Platform):
                         f" export TERM='{term}'",
                     ]
                 )
-            ).encode()
+            )
             self.send_cmd(payload)
             if self.__got_pty and not self.__interactive:
                 # we already have pty but have been backgrounded

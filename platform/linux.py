@@ -112,7 +112,7 @@ class Linux(Platform):
 
     def get_pty(self) -> bool:
         got_pty: bool = False
-        res, _ = self.channel.send(b"set +o history\n")
+        res, _ = self.send_cmd("set +o history") # disable history
         time.sleep(0.1)
         best_shell = "sh"
         pty_options = [ 
@@ -129,7 +129,7 @@ class Linux(Platform):
                     "python3.10",
                     "python3.11"
                 ],
-                "{binary_path} -c \"import pty; pty.spawn('{shell}')\" 2>&1\n",
+                "{binary_path} -c \"import pty; pty.spawn('{shell}')\" 2>&1",
             ) 
         ]
         for binaries, payload_format in pty_options:
@@ -137,8 +137,7 @@ class Linux(Platform):
                 resp = self.which(binary, False) # don't have pty yet, so no echo
                 if resp and not (f"which: no {binary} in" in resp or "not found" in resp) and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
-                    got_pty, _ = self.channel.send(payload.encode()) 
-                    
+                    got_pty, _ = self.send_cmd(payload) 
                     break
             if got_pty:
                 self.__got_pty = got_pty
@@ -155,7 +154,7 @@ class Linux(Platform):
             if not self.__interactive:
                 self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
                 tty.setraw(sys.stdin.fileno())
-            res, _ = self.channel.send(b"set +o history\n")
+            res, _ = self.send_cmd("set +o history")
             time.sleep(0.1)
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
@@ -168,12 +167,12 @@ class Linux(Platform):
                     ]
                 )
             ).encode()
-            transaction.Transaction(payload, self).execute()
+            self.send_cmd(payload)
             if self.__got_pty and not self.__interactive:
                 # we already have pty but have been backgrounded
                 # call exit to leave sh shell that we called
                 # when we backgrounded the shell
-                res, _ = self.channel.send(b"exit\n")
+                res, _ = self.send_cmd("exit")
             elif (not self.__got_pty) and self.get_pty():
                 best_shell = "sh"
                 better_shells = ["zsh", "bash", "ksh", "fish"]
@@ -182,17 +181,15 @@ class Linux(Platform):
                     if resp and not (f"which: no {shell} in" in resp or "not found" in resp) and shell in resp:
                         best_shell = shell
                         break
-                res, _ = self.channel.send(best_shell.encode() + b"\n") 
-                time.sleep(0.1)
-                res, _ = self.channel.send(b"set +o history\n")
-                time.sleep(0.1)
+                res, _ = self.send_cmd(best_shell) 
+                res, _ = self.send_cmd("set +o history")
                 prompt = Linux.PROMPTS["default"]
                 if best_shell in Linux.PROMPTS.keys():
                     prompt = Linux.PROMPTS[best_shell]
                 prompt = prompt.replace("remote", f"session {session_id}")
-                self.channel.send(f"export PS1={prompt}\n".encode())
+                self.send_cmd(f"export PS1={prompt}")
             if res:
-                self.channel.wait_data(0.2)
+                self.channel.wait_data(0.1)
                 time.sleep(0.2)
                 self.channel.purge()
                 res, _ = self.channel.send(b"\n")
@@ -210,10 +207,10 @@ class Linux(Platform):
             if res and self.channel.is_open:
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell
-                res, _ = self.channel.send(b"sh\n")
-                time.sleep(0.1)
-                res, _ = self.channel.send(b"set +o history\n")
-                self.channel.wait_data(0.2)
+                res, _ = self.send_cmd("sh")
+                res, _ = self.send_cmd("set +o history")
+                res, _ = self.send_cmd("unset PS1") # remove prompt
+                self.channel.wait_data(0.1)
                 time.sleep(0.2)
                 self.channel.purge()
             self.__interactive = False

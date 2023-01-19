@@ -258,10 +258,10 @@ class Engine:
         return res, error
 
     def __get_prompt(self) -> str:
-        host = self.__manager.get_session_remote()
-        if not host:
-            host = "@localhost"
-        prompt = style.bold(style.yellow(f"[{host}]")) + " " + style.bold(style.green(self.__name)) + "🐈 "
+        info = self.__manager.get_session_info()
+        if not info:
+            info = "None: @local"
+        prompt = style.bold(style.yellow(f"[{info}]")) + " " + style.bold(style.green(self.__name)) + "🐈 "
         return prompt
 
     # -------------------------------------------------------------------------------------------#

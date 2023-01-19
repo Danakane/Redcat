@@ -258,14 +258,14 @@ class Manager:
                 serializations.append(f"{id},{listen_point.endpoint},{listen_point.platform_name}")
         return res, error, "\n".join(serializations)
 
-    def get_session_remote(self, id: str = "") -> str:
-        host = ""
+    def get_session_info(self, id: str = "") -> str:
+        info = ""
         if not id:
             id = self.__selected_id
         if id in self.__sessions.keys():
             sess = self.__sessions[id]
-            host = sess.remote
-        return host
+            info = f"session {id}: {sess.user}@{sess.hostname}"
+        return info
 
     def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False

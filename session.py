@@ -21,7 +21,8 @@ class Session:
         if self.__chan:
             self.__chan.error_callback = self.on_error
             self.__platform = platform.factory.get_platform(self.__chan, platform_name)
-        self.__hostname = ""
+        self.__hostname: str = ""
+        self.__user: str = ""
         self.__interactive: bool = False
         self.__thread_reader: threading.Thread = None
         self.__thread_writer: threading.Thread = None
@@ -38,6 +39,13 @@ class Session:
             if not self.__hostname:
                 self.__hostname = self.platform.hostname()[2]
         return self.__hostname
+
+    @property
+    def user(self) -> str:
+        if self.__chan.is_open:
+            if not self.__user:
+                self.__user = self.platform.whoami()[2]
+        return self.__user            
 
     @property
     def remote(self) -> str:
@@ -80,6 +88,8 @@ class Session:
 
     def interactive(self, value: bool, session_id: str = None) -> bool:
         if (self.__interactive != value) and self.__platform:
+            if not value:
+                self.__user = ""
             self.__platform.interactive(value, session_id)
             self.__interactive = self.__platform.is_interactive
         return self.__interactive

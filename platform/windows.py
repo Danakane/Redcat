@@ -21,7 +21,7 @@ class Windows(Platform):
     def is_interactive(self) -> bool:
         return self.__interactive
 
-    def interactive(self, value: bool) -> bool:
+    def interactive(self, value: bool, session_id: str = None) -> bool:
         self.__interactive = value
         return True
 
@@ -31,6 +31,11 @@ class Windows(Platform):
     def whoami(self) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
         res, data = transaction.Transaction(f"whoami".encode(), self, True).execute()
+        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
+
+    def hostname(self) -> typing.Tuple[bool, str, str]:
+        self.channel.purge()
+        res, data = transaction.Transaction(f"hostname".encode(), self, True).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:

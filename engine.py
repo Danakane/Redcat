@@ -248,7 +248,7 @@ class Engine:
                 if row:
                     data.append(row.split(","))
             if type == "sessions":
-                headers = ["ID", "User", "Remote host", "Platform"]
+                headers = ["ID", "User", "Remote host", "End point", "Platform"]
                 print("\n" + style.tabulate(headers, data) + "\n")
                 res = True
             elif type == "listeners":

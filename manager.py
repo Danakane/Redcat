@@ -76,7 +76,7 @@ class Manager:
     def __on_new_channel(self, sender: listener.Listener, chan: channel.Channel, platform_name: str) -> None:
         sess = session.Session(self.on_error, chan, platform_name=platform_name)
         sess.open()
-        id = -1
+        id = None
         while sender.running:
             if sess.wait_open(0.1):
                 with self.__lock_sessions:
@@ -86,7 +86,7 @@ class Manager:
                     if not self.__selected_session:
                         self.__selected_session = sess
                         self.__selected_id = id
-                    sess.interactive(True) # getting pty immediately
+                    sess.interactive(True, id) # getting pty immediately
                     sess.interactive(False)
                     break
         if not sender.running:
@@ -100,9 +100,9 @@ class Manager:
         res = False
         error = style.bold("failed to create session")
         if not background:
+            id = None
             chan = None
             sess = None
-            id = -1
             new_listener = listener.factory.get_listener(addr, port, platform_name)
             try:
                 res, error, chan, platform_name = new_listener.listen_once()
@@ -125,7 +125,7 @@ class Manager:
                     if id != -1 and id in self.__sessions.keys():
                         del self.__sessions[id]
             if sess:
-                sess.interactive(True) 
+                sess.interactive(True, id) 
                 sess.start()
                 sess.wait_stop()
                 sess.interactive(False)
@@ -145,8 +145,8 @@ class Manager:
         error = style.bold("failed to create session")
         sess = session.Session(self.on_error, addr=addr, port=port, platform_name=platform_name)
         res, error = sess.open()
+        id = None
         if res:
-            id = -1
             try:
                 if sess.wait_open():
                     with self.__lock_sessions:
@@ -166,7 +166,7 @@ class Manager:
                     if id != -1 and id in self.__sessions.keys():
                         del self.__sessions[id]
             if sess:
-                sess.interactive(True) 
+                sess.interactive(True, id) 
                 sess.start()
                 sess.wait_stop()
                 sess.interactive(False)
@@ -251,7 +251,7 @@ class Manager:
             res = True
             for id, sess in self.__sessions.items():
                 res, error, user = sess.platform.whoami()
-                serializations.append(f"{id},{user},{sess.remote},{sess.platform_name}")
+                serializations.append(f"{id},{user},{sess.hostname}, {sess.remote},{sess.platform_name}")
         elif type == "listeners":
             res = True
             for id, listen_point in self.__listeners.items():

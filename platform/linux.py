@@ -15,6 +15,13 @@ from platform import Platform, LINUX
 
 class Linux(Platform):
 
+    PROMPTS = {
+        "sh": """'$(command printf "([remote] $(whoami)@$(hostname):$PWD\\$ ")'""",
+        "dash": """'$(command printf "[remote] $(whoami)@$(hostname):$PWD\\$ ")'""",
+        "zsh": """'%B%F{red}[remote] %B%F{yellow}%n@%M%B%F{reset}:%B%F{cyan}$PWD%B%(#.%b%F{white}#.%b%F{white}$)%b%F{reset} '""",
+        "default": """'$(command printf "\\[\\033[01;31m\\][remote]\\[\\033[0m\\] \\[\\033[01;33m\\]$(whoami)@$(hostname)\\[\\033[0m\\]:\\[\\033[1;36m\\]$PWD\\[\\033[0m\\]\\$ ")'""",
+    }
+
     def __init__(self, chan: channel.Channel) -> None:
         super().__init__(chan, LINUX)
         self.__saved_settings = None
@@ -30,10 +37,10 @@ class Linux(Platform):
         res, data = transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
         return data.decode("utf-8")
 
-    def id(self, handle_echo: bool=True) -> str:
+    def hostname(self, handle_echo: bool=True) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"id -u".encode(), self, handle_echo).execute()
-        return data.decode("utf-8")
+        res, data = transaction.Transaction(f"hostname".encode(), self, handle_echo).execute()
+        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def whoami(self, handle_echo: bool=True) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
@@ -141,7 +148,7 @@ class Linux(Platform):
         self.channel.purge()
         return got_pty
 
-    def interactive(self, value: bool) -> bool:
+    def interactive(self, value: bool, session_id: str = None) -> bool:
         res = False
         if value:
             # save the terminal settings going in raw mode
@@ -178,6 +185,12 @@ class Linux(Platform):
                 res, _ = self.channel.send(best_shell.encode() + b"\n") 
                 time.sleep(0.1)
                 res, _ = self.channel.send(b"set +o history\n")
+                time.sleep(0.1)
+                prompt = Linux.PROMPTS["default"]
+                if best_shell in Linux.PROMPTS.keys():
+                    prompt = Linux.PROMPTS[best_shell]
+                prompt = prompt.replace("remote", f"session {session_id}")
+                self.channel.send(f"export PS1={prompt}\n".encode())
             if res:
                 self.channel.wait_data(0.2)
                 time.sleep(0.2)

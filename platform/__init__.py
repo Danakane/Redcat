@@ -30,7 +30,7 @@ class Platform(abc.ABC):
         pass
 
     @abstractmethod
-    def interactive(self, value: bool) -> bool:
+    def interactive(self, value: bool, session_id: str = None) -> bool:
         pass
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
@@ -40,7 +40,10 @@ class Platform(abc.ABC):
         return False, style.bold(f"not implemented for {self.__platform_name} platform")
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
-        return False, style.bold(f"not implemented for {self.__platform_name} platform"), ""
+        return False, style.bold(f"not implemented for {self.__platform_name} platform"), b""
+
+    def hostname(self) -> typing.Tuple[bool, str, str]:
+        return False, style.bold(f"not implemented for {self.__platform_name} platform"), b""
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
         return b"echo " + start + b";" + payload + b";" + b"echo " + end + b"\n"

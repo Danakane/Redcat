@@ -285,7 +285,6 @@ class Engine:
                         error = "unspecified error"
                     print(style.bold(style.red("[!] error: ")) + error)
             except EOFError:
-                print()
                 if self.__manager.selected_id:
                     self.__manager.remote_shell()
             except KeyboardInterrupt:

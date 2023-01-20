@@ -174,7 +174,7 @@ class Linux(Platform):
                 res, _ = self.send_cmd("exit")
             elif (not self.__got_pty) and self.get_pty():
                 best_shell = "sh"
-                better_shells = ["zsh", "bash", "ksh", "fish"]
+                better_shells = ["zsh", "bash", "ksh", "fish", "dash"]
                 for shell in better_shells:
                     resp = self.which(shell, True)
                     if resp and not (f"which: no {shell} in" in resp or "not found" in resp) and shell in resp:

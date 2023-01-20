@@ -206,7 +206,7 @@ class Manager:
     def select_session(self, id: str) -> typing.Tuple[int, str]:
         res = False
         error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
-        if id == "-1":
+        if id == "none":
             self.__selected_id = ""
             self.__selected_session = None
             res = True

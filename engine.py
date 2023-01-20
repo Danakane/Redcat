@@ -52,7 +52,7 @@ class Engine:
         cmd_show.add_argument("type", type=str, nargs=1, choices=["sessions", "listeners"], help="the objects to display")
         self.__commands[cmd_show.name] = cmd_show
         # select session command
-        cmd_session = command.Command("session", self.__manager.select_session, "select the session for a given id (-1 to unselect)")
+        cmd_session = command.Command("session", self.__manager.select_session, "select the session for a given id (none to unselect)")
         cmd_session.parser.add_argument("id", type=str, nargs=1, help="id of session to select")
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command

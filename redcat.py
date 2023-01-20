@@ -28,13 +28,10 @@ if __name__ == "__main__":
     error = ""
     with engine.Engine("redcat") as redcat:
         if port:
-            try:
-                if bind:
-                    res, error = redcat.manager.listen(addr, port, platform_name)
-                else:
-                    res, error = redcat.manager.connect(addr, port, platform_name)
-            except KeyboardInterrupt:
-                res = False
+            if bind:
+                res, error = redcat.manager.listen(addr, port, platform_name)
+            else:
+                res, error = redcat.manager.connect(addr, port, platform_name)
         if res:
             redcat.run()
         else:

@@ -23,6 +23,8 @@ class Windows(Platform):
 
     def interactive(self, value: bool, session_id: str = None) -> bool:
         self.__interactive = value
+        self.channel.purge()
+        self.channel.send(b"\n")
         return True
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:

@@ -2,18 +2,19 @@ import select
 import socket
 import typing
 
-import style
-import utils
-import channel.factory
-import listener
+import redcat.style
+import redcat.utils
+import redcat.channel
+import redcat.channel.factory
+import redcat.listener
 
-class TcpListener(listener.Listener):
+class TcpListener(redcat.listener.Listener):
 
     def __init__(self, addr: str, port: int, platform_name: str, callback: typing.Callable = None) -> None:
         super().__init__(platform_name, callback)
         self.__endpoint: typing.Tuple[typing.Any] = None
         self.__protocol: int = socket.AF_INET
-        if utils.valid_ip_address(addr) == socket.AF_INET:
+        if redcat.utils.valid_ip_address(addr) == socket.AF_INET:
             self.__endpoint = (addr, port)
             self.__protocol = socket.AF_INET
         else:
@@ -37,7 +38,7 @@ class TcpListener(listener.Listener):
             error = ""
         except socket.error as err:
             res = False
-            error = style.bold(": ".join([str(arg) for arg in err.args]))
+            error = redcat.style.bold(": ".join([str(arg) for arg in err.args]))
         return res, error
 
     def on_stop(self) -> None:
@@ -50,10 +51,10 @@ class TcpListener(listener.Listener):
             finally:
                 self.__sock = None
 
-    def listen(self) -> channel.Channel:
+    def listen(self) -> redcat.channel.Channel:
         chan = None
         readables, _, _ = select.select([self.__sock], [], [], 0.1)
         if readables:
             sock, remote = self.__sock.accept()
-            chan = channel.factory.get_channel_from_remote(remote, sock, channel.TCP)
+            chan = redcat.channel.factory.get_channel_from_remote(remote, sock, redcat.channel.TCP)
         return chan

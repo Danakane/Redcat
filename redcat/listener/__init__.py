@@ -3,7 +3,7 @@ import typing
 import abc
 from abc import abstractmethod
 
-import channel
+import redcat.channel
 
 class Listener:
 
@@ -19,7 +19,7 @@ class Listener:
         pass
 
     @abstractmethod
-    def listen(self) -> channel.Channel:
+    def listen(self) -> redcat.channel.Channel:
         pass
 
     @abstractmethod
@@ -58,8 +58,8 @@ class Listener:
             if chan and self.__callback:
                 self.__callback(self, chan, self.__platform_name)
 
-    def listen_once(self) -> typing.Tuple[bool, str, channel.Channel, str]:
-        chan: channel.Channel = None
+    def listen_once(self) -> typing.Tuple[bool, str, redcat.channel.Channel, str]:
+        chan: redcat.channel.Channel = None
         res, error = self.on_start()
         while not chan:
             chan = self.listen()

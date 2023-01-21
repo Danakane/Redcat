@@ -3,22 +3,22 @@ import typing
 import threading
 import shlex
 
-import style
-import channel
-import platform
-import listener, listener.factory
-import session
+import redcat.style
+import redcat.channel
+import redcat.platform
+import redcat.listener, redcat.listener.factory
+import redcat.session
 
 
 class Manager:
 
     def __init__(self) -> None:
         self.__lock_sessions: threading.Lock = threading.Lock()
-        self.__sessions: typing.Dict[str, session.Session] = {}
+        self.__sessions: typing.Dict[str, redcat.session.Session] = {}
         self.__lock_broken_sessions: threading.Lock = threading.Lock()
         self.__broken_sessions: typing.List[str] = []
         self.__selected_id: str = ""
-        self.__selected_session: session.Session = None
+        self.__selected_session: redcat.session.Session = None
         self.__sessions_last_id: int = 0
         self.__lock_listeners: threading.Lock = threading.Lock()
         self.__listeners: typing.Dict[str, typing.Tuple(threading.Thread, threading.Event)] = {}
@@ -27,7 +27,7 @@ class Manager:
         self.__stop_evt: threading.Event = threading.Event()
 
     @property
-    def sessions(self) -> typing.Dict[str, session.Session]:
+    def sessions(self) -> typing.Dict[str, redcat.session.Session]:
         return self.__sessions
 
     @property
@@ -35,7 +35,7 @@ class Manager:
         return self.__selected_id
 
     @property
-    def selected_session(self) -> session.Session:
+    def selected_session(self) -> redcat.session.Session:
         return self.__selected_session
 
     def start(self) -> None:
@@ -73,8 +73,8 @@ class Manager:
                 self.__broken_sessions.clear()
             time.sleep(0.1)
 
-    def __on_new_channel(self, sender: listener.Listener, chan: channel.Channel, platform_name: str) -> None:
-        sess = session.Session(self.on_error, chan, platform_name=platform_name)
+    def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
+        sess = redcat.session.Session(self.on_error, chan, platform_name=platform_name)
         sess.open()
         id = None
         while sender.running:
@@ -96,18 +96,18 @@ class Manager:
                     sess.close()
                     sess = None
 
-    def listen(self, addr: str, port: int, platform_name: str = platform.LINUX, background: bool = False) -> typing.Tuple[bool, str]:
+    def listen(self, addr: str, port: int, platform_name: str = redcat.platform.LINUX, background: bool = False) -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("failed to create session")
+        error = redcat.style.bold("failed to create session")
         if not background:
             id = None
             chan = None
             sess = None
-            new_listener = listener.factory.get_listener(addr, port, platform_name)
+            new_listener = redcat.listener.factory.get_listener(addr, port, platform_name)
             try:
                 res, error, chan, platform_name = new_listener.listen_once()
                 if res and chan:
-                    sess = session.Session(self.on_error, chan, platform_name=platform_name)
+                    sess = redcat.session.Session(self.on_error, chan, platform_name=platform_name)
                     sess.open()
                     if sess.wait_open():
                         with self.__lock_sessions:
@@ -133,17 +133,17 @@ class Manager:
                 res = True
                 error = ""
         else:
-            new_listener = listener.factory.get_listener(addr, port, platform_name, callback=self.__on_new_channel)
+            new_listener = redcat.listener.factory.get_listener(addr, port, platform_name, callback=self.__on_new_channel)
             with self.__lock_listeners:
                 self.__listeners[str(self.__listeners_last_id)] = new_listener
                 self.__listeners_last_id += 1
             res, error = new_listener.start()
         return res, error
 
-    def connect(self, addr: str, port: int, platform_name: str = platform.LINUX) -> typing.Tuple[bool, str]:
+    def connect(self, addr: str, port: int, platform_name: str = redcat.platform.LINUX) -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("failed to create session")
-        sess = session.Session(self.on_error, addr=addr, port=port, platform_name=platform_name)
+        error = redcat.style.bold("failed to create session")
+        sess = redcat.session.Session(self.on_error, addr=addr, port=port, platform_name=platform_name)
         res, error = sess.open()
         id = None
         if res:
@@ -158,7 +158,7 @@ class Manager:
                             self.__selected_id = id
             except KeyboardInterrupt:
                 res = False
-                error = style.bold("failed to create session")
+                error = redcat.style.bold("failed to create session")
                 if sess:
                     sess.stop()
                     sess.close()
@@ -178,7 +178,7 @@ class Manager:
     # kill a session or a listener
     def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("invalid parameter ") + style.bold(style.red(f"{type}"))
+        error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
         if type == "session":
             with self.__lock_sessions:
                 if id in self.__sessions.keys():
@@ -191,7 +191,7 @@ class Manager:
                         self.__selected_id = ""
                         self.__selected_session = None
                 else:
-                    error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+                    error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         elif type == "listener":
             with self.__lock_listeners:
                 if id in self.__listeners.keys():
@@ -200,12 +200,12 @@ class Manager:
                     del self.__listeners[id]
                     res = True
                 else:
-                    error = style.bold("unknown listener id ") + style.bold(style.red(f"{id}"))
+                    error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
 
     def select_session(self, id: str) -> typing.Tuple[int, str]:
         res = False
-        error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         if id == "none":
             self.__selected_id = ""
             self.__selected_session = None
@@ -222,7 +222,7 @@ class Manager:
         res = False 
         if not id:
             id = self.__selected_id
-        error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+        error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         if id in self.__sessions.keys():
             sess = self.__sessions[id]
             if sess.is_open:
@@ -240,12 +240,12 @@ class Manager:
                 res = True
                 error = ""
             else:
-                error = style.bold("session " + style.red(id) + " is broken")
+                error = redcat.style.bold("session " + redcat.style.red(id) + " is broken")
         return res, error
 
     def show(self, type: str) -> typing.Tuple[bool, str, str]:
         res = False
-        error = style.bold("invalid parameter ") + style.bold(style.red(f"{type}"))
+        error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
         serializations = []
         if type == "sessions":
             res = True
@@ -269,7 +269,7 @@ class Manager:
 
     def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("download operation failed")
+        error = redcat.style.bold("download operation failed")
         rfile = shlex.quote(rfile) # to avoid remote command injection though it's kinda useless
         if not id:
             id = self.__selected_id
@@ -282,20 +282,20 @@ class Manager:
                         f.write(data)
                 except FileNotFoundError:
                     res = False
-                    error = style.bold("cannot write local file ") + style.bold(style.red(f"{lfile}")) + style.bold(": parent directory not found")
+                    error = redcat.style.bold("cannot write local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) + redcat.style.bold(": parent directory not found")
                 except PermissionError:
                     res = False
-                    error = style.bold("don't have permission to write local file ") + style.bold(style.red(f"{lfile}")) 
+                    error = redcat.style.bold("don't have permission to write local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) 
         else:
             if not id:
-                error = style.bold("no session selected for the download operation")
+                error = redcat.style.bold("no session selected for the download operation")
             else:
-                error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+                error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
  
     def upload(self, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("upload operation failed")
+        error = redcat.style.bold("upload operation failed")
         if not id:
             id = self.__selected_id
         if id in self.__sessions.keys():
@@ -306,23 +306,23 @@ class Manager:
                     res, error = sess.upload(rfile, data)
             except FileNotFoundError:
                 res = False
-                error = style.bold("local file ") + style.bold(style.red(f"{lfile}")) + style.bold(" not found")
+                error = redcat.style.bold("local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) + redcat.style.bold(" not found")
             except IsADirectoryError:
                 res = False
-                error = style.bold("local ") + style.bold(style.red(f"{lfile}")) + style.bold(" is a directory")
+                error = redcat.style.bold("local ") + redcat.style.bold(redcat.style.red(f"{lfile}")) + redcat.style.bold(" is a directory")
             except PermissionError:
                 res = False
-                error = style.bold("don't have permission to read local file ") + style.bold(style.red(f"{lfile}")) 
+                error = redcat.style.bold("don't have permission to read local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) 
         else:
             if not id:
-                error = style.bold("no session selected for the upload operation")
+                error = redcat.style.bold("no session selected for the upload operation")
             else:
-                error = style.bold("unknown session id ") + style.bold(style.red(f"{id}"))
+                error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
 
     def on_error(self, obj: typing.Any, error: str) -> None:
         obj_id = -1
-        print(style.bold(style.red("[!] error: ") + error))
+        print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
         with self.__lock_sessions:
             for id, sess in self.__sessions.items():
                 if sess == obj:

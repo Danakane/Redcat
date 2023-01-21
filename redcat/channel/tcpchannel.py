@@ -5,12 +5,12 @@ import select
 import threading
 import typing
 
-import style
-import utils
-import channel
+import redcat.style
+import redcat.utils
+import redcat.channel
 
 
-class TcpChannel(channel.Channel):
+class TcpChannel(redcat.channel.Channel):
 
     def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None) -> None:
         super().__init__()
@@ -40,7 +40,7 @@ class TcpChannel(channel.Channel):
             try:
                 protocol = socket.AF_INET
                 endpoint = (self.__addr, self.__port)
-                if utils.valid_ip_address(self.__addr) == socket.AF_INET6:
+                if redcat.utils.valid_ip_address(self.__addr) == socket.AF_INET6:
                     endpoint = (self.__addr, self.__port, 0, 0)
                     protocol = socket.AF_INET6
                 self.__sock = socket.socket(protocol, socket.SOCK_STREAM)
@@ -49,7 +49,7 @@ class TcpChannel(channel.Channel):
                 res = True
                 error = ""
             except Exception as err:
-                error = style.bold(": ".join(str(arg) for arg in err.args))
+                error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
         else:
             res = True
             error = ""
@@ -89,11 +89,11 @@ class TcpChannel(channel.Channel):
                         data = self.__sock.recv(4096)
                         if len(data) == 0:
                             res = False
-                            error = style.bold(f"Connection with remote @{self.__remote[0]}:{self.__remote[1]} broken")
+                            error = redcat.style.bold(f"Connection with remote @{self.__remote[0]}:{self.__remote[1]} broken")
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:
-                        error = style.bold(": ".join(str(arg) for arg in err.args))
+                        error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
                         res = False
             except select.error as err:
                 res = False
@@ -108,7 +108,7 @@ class TcpChannel(channel.Channel):
             res = True
             error = ""
         except Exception as err:
-            error =  style.bold(": ".join(str(arg) for arg in err.args))
+            error =  redcat.style.bold(": ".join(str(arg) for arg in err.args))
         return res, error
 
 

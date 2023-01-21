@@ -2,25 +2,25 @@ import sys
 import threading
 import typing
 
-import channel, channel.factory
-import platform, platform.factory
-import transaction
+import redcat.channel, redcat.channel.factory
+import redcat.platform, redcat.platform.factory
+import redcat.transaction
 
 
 class Session: 
 
-    def __init__(self, error_callback: typing.Callable, chan: channel.Channel = None, addr: str = None, port: int = None,
-                 channel_protocol:int=channel.TCP, platform_name: str=platform.LINUX) -> None:
+    def __init__(self, error_callback: typing.Callable, chan: redcat.channel.Channel = None, addr: str = None, port: int = None,
+                 channel_protocol:int=redcat.channel.TCP, platform_name: str=redcat.platform.LINUX) -> None:
         self.__error_callback: typing.Callable = error_callback
-        self.__chan: channel.Channel = None
-        self.__platform: platform.Platform = None
+        self.__chan: redcat.channel.Channel = None
+        self.__platform: redcat.platform.Platform = None
         if chan:
             self.__chan = chan
         else:
-            self.__chan: channel.Channel = channel.factory.get_channel(addr, port, channel_protocol)
+            self.__chan = redcat.channel.factory.get_channel(addr, port, channel_protocol)
         if self.__chan:
             self.__chan.error_callback = self.on_error
-            self.__platform = platform.factory.get_platform(self.__chan, platform_name)
+            self.__platform = redcat.platform.factory.get_platform(self.__chan, platform_name)
         self.__hostname: str = ""
         self.__user: str = ""
         self.__interactive: bool = False
@@ -60,7 +60,7 @@ class Session:
         return self.__platform.platform_name
 
     @property
-    def platform(self) -> platform.Platform:
+    def platform(self) -> redcat.platform.Platform:
         return self.__platform
 
     @property

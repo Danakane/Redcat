@@ -7,7 +7,7 @@ import typing
 import abc
 from abc import abstractmethod
 
-import utils
+import redcat.utils
 
 TCP: int = 0
 
@@ -152,7 +152,7 @@ class Channel(abc.ABC):
                     res, error, resp = self.recv()
                     rdata += resp
                 resp = b""
-                rdata = utils.extract_data(rdata, end)
+                rdata = redcat.utils.extract_data(rdata, end)
             while res and (not start_received):
                 res, error, resp = self.recv()
                 rdata += resp
@@ -171,7 +171,7 @@ class Channel(abc.ABC):
         if not res:
             rdata = b""
         else:
-            rdata = utils.extract_data(rdata, start, end)
+            rdata = redcat.utils.extract_data(rdata, start, end)
         return res, rdata
 
     def wait_open(self, timeout=None) -> bool:

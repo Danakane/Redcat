@@ -2,13 +2,13 @@ import base64
 import os
 import typing
 
-import platform
+import redcat.platform
 
 class Transaction:
 
-    def __init__(self, payload: bytes, pltf: platform.Platform, handle_echo: bool = False) -> None:
+    def __init__(self, payload: bytes, pltf: redcat.platform.Platform, handle_echo: bool = False) -> None:
         self.__payload: bytes = payload
-        self.__platform: platform.Platform = pltf
+        self.__platform: redcat.platform.Platform = pltf
         self.__handle_echo: bool = handle_echo
         self.__start: bytes = base64.b64encode(os.urandom(16))
         self.__end: bytes = base64.b64encode(os.urandom(16))

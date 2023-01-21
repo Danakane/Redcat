@@ -7,10 +7,10 @@ import typing
 import base64
 import shlex
 
-import style
-import channel
-import transaction
-from platform import Platform, LINUX
+import redcat.style
+import redcat.channel
+import redcat.transaction
+from redcat.platform import Platform, LINUX
 
 
 class Linux(Platform):
@@ -23,7 +23,7 @@ class Linux(Platform):
         "default": """'$(command printf "\\[\\033[01;31m\\][remote] \\[\\033[0m\\]\\[\\033[01;33m\\]$(whoami)@$(hostname)\\[\\033[0m\\]:\\[\\033[1;36m\\]$PWD\\[\\033[0m\\]\\$ ")'"""
     }
 
-    def __init__(self, chan: channel.Channel) -> None:
+    def __init__(self, chan: redcat.channel.Channel) -> None:
         super().__init__(chan, LINUX)
         self.__saved_settings = None
         self.__got_pty: bool = False
@@ -35,42 +35,42 @@ class Linux(Platform):
 
     def which(self, name: str, handle_echo: bool=True) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
+        res, data = redcat.transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
         return data.decode("utf-8")
 
     def hostname(self, handle_echo: bool=True) -> str:
         self.channel.purge()
-        res, data = transaction.Transaction(f"hostname".encode(), self, handle_echo).execute()
+        res, data = redcat.transaction.Transaction(f"hostname".encode(), self, handle_echo).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def whoami(self, handle_echo: bool=True) -> typing.Tuple[bool, str, str]:
         self.channel.purge()
-        res, data = transaction.Transaction(f"whoami".encode(), self, handle_echo).execute()
+        res, data = redcat.transaction.Transaction(f"whoami".encode(), self, handle_echo).execute()
         return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
-        error = style.bold("Failed to download remote file ") + style.bold(style.red(f"{rfile}"))
+        error = redcat.style.bold("Failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
         self.channel.purge()
         with self.channel.transaction_lock:
-            res, data = transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
+            res, data = redcat.transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
-                error = style.bold("can't find remote file ") + style.bold(style.red(f"{rfile}"))
+                error = redcat.style.bold("can't find remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
             elif b"Is a directory" in data:
                 res = False
-                error = style.bold("remote ") + style.bold(style.red(f"{rfile}")) + style.bold(" is a directory")
+                error = redcat.style.bold("remote ") + redcat.style.bold(redcat.style.red(f"{rfile}")) + redcat.style.bold(" is a directory")
             elif b"Permission denied" in data:
                 res = False
-                error = style.bold("don't have permission to read remote file ") + style.bold(style.red(f"{rfile}"))
+                error = redcat.style.bold("don't have permission to read remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
             else:
-                res, data = transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
+                res, data = redcat.transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
                 data = base64.b64decode(data)
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         res = False
-        error = style.bold("Failed to upload file ") + style.bold(style.red(f"{rfile}")) 
+        error = redcat.style.bold("Failed to upload file ") + redcat.style.bold(redcat.style.red(f"{rfile}")) 
         self.channel.purge()
         encoded = base64.b64encode(data)
         # devide encoded data into chunks of 4096 bytes at most
@@ -85,29 +85,29 @@ class Linux(Platform):
             if parent:
                 tmp_file = f"{parent}/{tmp_file}"
             tmp_file = shlex.quote(tmp_file)
-            res, data = transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
+            res, data = redcat.transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
             if b"No such file or directory" in data:
                 res = False
-                error = style.bold("can't find remote parent directory")
+                error = redcat.style.bold("can't find remote parent directory")
             elif b"Permission denied" in data:
                 res = False
-                error = style.bold("don't have permission to write in remote parent directory")
+                error = redcat.style.bold("don't have permission to write in remote parent directory")
             else:
-                style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                redcat.style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 # Don't handle echo, it's less error prone and we don't care about the output anyway
-                res, _ = transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
+                res, _ = redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
                 i = 1
-                style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 if length > 1:
                     for chunk in chunks[1:]:
                         i += 1
-                        res, _ = transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
-                        style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
+                        res, _ = redcat.transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
+                        redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
                 rfile = shlex.quote(rfile)
-                res, _ = transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, False).execute()
-                res, _ = transaction.Transaction(f"rm {tmp_file}".encode(), self, False).execute()
+                res, _ = redcat.transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, False).execute()
+                res, _ = redcat.transaction.Transaction(f"rm {tmp_file}".encode(), self, False).execute()
                 error = ""
         return res, error
 

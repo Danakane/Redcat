@@ -30,10 +30,6 @@ class Session:
         self.__running: bool = False 
 
     @property
-    def id(self) -> str:
-        return self.__id
-
-    @property
     def hostname(self) -> str:
         if self.__chan.is_open:
             if not self.__hostname:

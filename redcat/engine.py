@@ -170,11 +170,15 @@ class Engine:
         res = True
         error = ""
         if cmd:
-            name = shlex.split(cmd)[0]
-            res = False
-            error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.red(f"{name}"))
-            if name in self.__commands.keys():
-                res, error = self.__commands[name].exec(cmd)
+            try:
+                res = False
+                name = shlex.split(cmd)[0]
+                error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.red(f"{name}"))
+                if name in self.__commands.keys():
+                    res, error = self.__commands[name].exec(cmd)
+            except ValueError as err:
+                message = ": ".join([str(arg) for arg in err.args])
+                error = redcat.style.bold(f"{message}: command ") + redcat.style.bold(redcat.style.red(f"{cmd}"))
         return res, error
 
     def __system(self, args):

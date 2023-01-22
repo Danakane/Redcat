@@ -60,14 +60,14 @@ class Linux(Platform):
         with self.channel.transaction_lock:
             _, res, data = redcat.transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
             if not res:
-                error = redcat.style.bold("can't download") + redcat.style.bold(redcat.style.red(f"{rfile}: "))+ redcat.style.bold(data.decode("utf-8"))
+                error = redcat.style.bold("can't download ") + redcat.style.bold(redcat.style.red(f"{rfile}: "))+ redcat.style.bold(data.decode("utf-8"))
             else:
                 _, res, data = redcat.transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
                 if res:
                     data = base64.b64decode(data)
                     error = ""
                 else:
-                    error = redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
+                    error = redcat.style.bold("failed to download ") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
@@ -90,7 +90,7 @@ class Linux(Platform):
             res, cmd_success, data = redcat.transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
             if not cmd_success:
                 res = False
-                error = redcat.style.bold("can't upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
+                error = redcat.style.bold("can't upload ") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
             else:
                 redcat.style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, True).execute()
@@ -104,12 +104,12 @@ class Linux(Platform):
                 print()
                 # decode the temporary file into the final file and delete the temporary file
                 rfile = shlex.quote(rfile)
-                _, res, _ = redcat.transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, True).execute()
-                _, _, _ = redcat.transaction.Transaction(f"rm {tmp_file}".encode(), self, True).execute()
+                _, res, data = redcat.transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, True).execute()
+                redcat.transaction.Transaction(f"rm {tmp_file}".encode(), self, True).execute()
                 if res:
                     error = ""
                 else:
-                    redcat.style.bold("failed to upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
+                    redcat.style.bold("failed to upload ") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
         return res, error
 
     def get_pty(self) -> bool:

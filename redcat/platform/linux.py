@@ -33,44 +33,46 @@ class Linux(Platform):
     def is_interactive(self) -> bool:
         return self.__interactive
 
-    def which(self, name: str, handle_echo: bool=True) -> str:
+    def which(self, name: str, handle_echo: bool=True) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
-        res, data = redcat.transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
-        return data.decode("utf-8")
+        res, cmd_success, data = redcat.transaction.Transaction(f"which {name}".encode(), self, handle_echo).execute()
+        return res, cmd_success, data.decode("utf-8")
 
-    def hostname(self, handle_echo: bool=True) -> str:
+    def hostname(self, handle_echo: bool=True) -> typing.Tuple[bool, str, bool, str]:
         self.channel.purge()
-        res, data = redcat.transaction.Transaction(f"hostname".encode(), self, handle_echo).execute()
-        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
+        res, cmd_success, data = redcat.transaction.Transaction(f"hostname".encode(), self, handle_echo).execute()
+        if not cmd_success:
+            data = b"" # if failure return empty string
+        return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "")
 
-    def whoami(self, handle_echo: bool=True) -> typing.Tuple[bool, str, str]:
+    def whoami(self, handle_echo: bool=True) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
-        res, data = redcat.transaction.Transaction(f"whoami".encode(), self, handle_echo).execute()
-        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "")
+        res, cmd_success, data = redcat.transaction.Transaction(f"whoami".encode(), self, handle_echo).execute()
+        if not cmd_success:
+            data = b"" # if failure return empty string
+        return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "")
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
-        error = redcat.style.bold("Failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+        error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+        data = b""
         self.channel.purge()
         with self.channel.transaction_lock:
-            res, data = redcat.transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
-            if b"No such file or directory" in data:
-                res = False
-                error = redcat.style.bold("can't find remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
-            elif b"Is a directory" in data:
-                res = False
-                error = redcat.style.bold("remote ") + redcat.style.bold(redcat.style.red(f"{rfile}")) + redcat.style.bold(" is a directory")
-            elif b"Permission denied" in data:
-                res = False
-                error = redcat.style.bold("don't have permission to read remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+            _, res, data = redcat.transaction.Transaction(f"head -1 {rfile} > /dev/null".encode(), self, True).execute()
+            if not res:
+                error = redcat.style.bold("can't download") + redcat.style.bold(redcat.style.red(f"{rfile}: "))+ style.bold(data.decode("utf-8"))
             else:
-                res, data = redcat.transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
-                data = base64.b64decode(data)
+                _, res, data = redcat.transaction.Transaction(f"base64 {rfile}".encode(), self, True).execute()
+                if res:
+                    data = base64.b64decode(data)
+                    error = ""
+                else:
+                    error = redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         res = False
-        error = redcat.style.bold("Failed to upload file ") + redcat.style.bold(redcat.style.red(f"{rfile}")) 
+        error = redcat.style.bold("failed to upload file ") + redcat.style.bold(redcat.style.red(f"{rfile}")) 
         self.channel.purge()
         encoded = base64.b64encode(data)
         # devide encoded data into chunks of 4096 bytes at most
@@ -85,30 +87,29 @@ class Linux(Platform):
             if parent:
                 tmp_file = f"{parent}/{tmp_file}"
             tmp_file = shlex.quote(tmp_file)
-            res, data = redcat.transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
-            if b"No such file or directory" in data:
+            res, cmd_success, data = redcat.transaction.Transaction(f"touch {tmp_file}".encode(), self, True).execute()
+            if not cmd_success:
                 res = False
-                error = redcat.style.bold("can't find remote parent directory")
-            elif b"Permission denied" in data:
-                res = False
-                error = redcat.style.bold("don't have permission to write in remote parent directory")
+                error = redcat.style.bold("can't upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
             else:
                 redcat.style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
-                # Don't handle echo, it's less error prone and we don't care about the output anyway
-                res, _ = redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
+                redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, True).execute()
                 i = 1
                 redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 if length > 1:
                     for chunk in chunks[1:]:
                         i += 1
-                        res, _ = redcat.transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
+                        redcat.transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
                         redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
                 rfile = shlex.quote(rfile)
-                res, _ = redcat.transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, False).execute()
-                res, _ = redcat.transaction.Transaction(f"rm {tmp_file}".encode(), self, False).execute()
-                error = ""
+                _, res, _ = redcat.transaction.Transaction(f"base64 -d {tmp_file} > {rfile}".encode(), self, True).execute()
+                _, _, _ = redcat.transaction.Transaction(f"rm {tmp_file}".encode(), self, True).execute()
+                if res:
+                    error = ""
+                else:
+                    redcat.style.bold("failed to upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
         return res, error
 
     def get_pty(self) -> bool:
@@ -135,8 +136,8 @@ class Linux(Platform):
         ]
         for binaries, payload_format in pty_options:
             for binary in binaries:
-                resp = self.which(binary, False) # don't have pty yet, so no echo
-                if resp and not (f"which: no {binary} in" in resp or "not found" in resp) and binary in resp:
+                _, cmd_success, resp = self.which(binary, False) # don't have pty yet, so no echo
+                if cmd_success and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
                     got_pty, _ = self.send_cmd(payload) 
                     break
@@ -177,8 +178,8 @@ class Linux(Platform):
                 best_shell = "sh"
                 better_shells = ["zsh", "bash", "ksh", "fish", "dash"]
                 for shell in better_shells:
-                    resp = self.which(shell, True)
-                    if resp and not (f"which: no {shell} in" in resp or "not found" in resp) and shell in resp:
+                    _, res, resp = self.which(shell, True)
+                    if res and shell in resp:
                         best_shell = shell
                         break
                 res, _ = self.send_cmd(best_shell) 

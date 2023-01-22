@@ -35,21 +35,21 @@ class Platform(abc.ABC):
         pass
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
-        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform"), b""
-
-    def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
         return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
+    def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
+        return False, False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
+
     def whoami(self) -> typing.Tuple[bool, str, str]:
-        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform"), b""
+        return False, Dalse, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def hostname(self) -> typing.Tuple[bool, str, str]:
-        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform"), b""
+        return False, False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
-    def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
-        return b"echo " + start + b";" + payload + b";" + b"echo " + end + b"\n"
+    def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
+        return b"echo " + start + b";" + payload + b" && echo " + control + b"; echo " + end + b"\n"
 
-    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bool, bytes]:
         return self.__chan.exec_transaction(buffer, start, end, handle_echo)
 
     def send_cmd(self, cmd: str, wait_for: int = 0.05) -> typing.Tuple[bool, str]:

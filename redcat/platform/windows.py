@@ -27,42 +27,46 @@ class Windows(Platform):
         self.channel.send(b"\n")
         return True
 
-    def build_transaction(self, payload: bytes, start: bytes, end: bytes) -> bytes:
-        return b"echo " + start + b" & " + payload + b" & " + b"echo " + end + b"\n"
+    def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
+        return b"echo " + start + b" & (" + payload + b" && echo " + control + b") & echo " + end + b"\n"
 
-    def whoami(self) -> typing.Tuple[bool, str, str]:
+    def whoami(self) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
-        res, data = redcat.transaction.Transaction(f"whoami".encode(), self, True).execute()
-        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
+        res, cmd_success, data = redcat.transaction.Transaction(f"whoami".encode(), self, True).execute()
+        if not cmd_success:
+            data = b""
+        return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 
-    def hostname(self) -> typing.Tuple[bool, str, str]:
+    def hostname(self) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
-        res, data = redcat.transaction.Transaction(f"hostname".encode(), self, True).execute()
-        return res, "", data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
+        res, cmd_success, data = redcat.transaction.Transaction(f"hostname".encode(), self, True).execute()
+        if not cmd_success:
+            data = b""
+        return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
         rfile = rfile.replace("'", "\"")
-        error = redcat.style.bold("Failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+        error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+        data = b""
         self.channel.purge()
         with self.channel.transaction_lock:
-            res, data = redcat.transaction.Transaction(f"type {rfile}".encode(), self, True).execute()
-            if b"The system cannot find the file specified." in data:
-                res = False
-                error = redcat.style.bold("can't find remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
-            elif b"The parameter is incorrect." in data:
-                res = False
-                error = redcat.style.bold("remote ") + redcat.style.bold(redcat.style.red(f"{rfile}")) + redcat.style.bold(" is a directory")
-            elif b"Access is denied." in data:
-                res = False
-                error = redcat.style.bold("don't have permission to read remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
+            _, res, data = redcat.transaction.Transaction(f"type {rfile}".encode(), self, True).execute()
+            if not res:
+                error = redcat.style.bold("can't download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
             else:
                 tmp_fname = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_").replace("=", "0") + ".tmp"
-                tmp_file = f"\"C:\\windows\\tasks\\{tmp_fname}\""
-                res, _ = redcat.transaction.Transaction(f"certutil -encode {rfile} {tmp_file}".encode(), self, False).execute()
-                res, data = redcat.transaction.Transaction(f"findstr /v CERTIFICATE {tmp_file}".encode(), self, True).execute()
-                res, _ = redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, False).execute()
-                data = base64.b64decode(data)
+                tmp_file = f"\"C:\\windows\\temp\\{tmp_fname}\""
+                _, res, data = redcat.transaction.Transaction(f"certutil -encode {rfile} {tmp_file}".encode(), self, False).execute()
+                if res:
+                    _, res, data = redcat.transaction.Transaction(f"findstr /v CERTIFICATE {tmp_file}".encode(), self, True).execute()
+                    _, _, _ = redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, False).execute()
+                    if res:
+                        data = base64.b64decode(data)
+                    else:
+                        error = redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                else:
+                    redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
@@ -83,28 +87,26 @@ class Windows(Platform):
             if parent:
                 tmp_file = f"{parent}/{tmp_file}"
             tmp_file = shlex.quote(tmp_file).replace("'", "\"")
-            res, data = redcat.transaction.Transaction(f"echo \"\" > {tmp_file}".encode(), self, True).execute()
-            if b"The system cannot find the path specified." in data:
-                res = False
-                error = redcat.style.bold("can't find remote parent directory")
-            elif b"Access is denied." in data:
-                res = False
-                error = redcat.style.bold("don't have permission to write in remote parent directory")
+            _, res, data = redcat.transaction.Transaction(f"echo \"\" > {tmp_file}".encode(), self, True).execute()
+            if not res:
+                error = redcat.style.bold("can't upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
             else:
                 redcat.style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
-                # Don't handle echo, it's less error prone and we don't care about the output anyway
-                res, _ = redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, False).execute()
+                redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, True).execute()
                 i = 1
                 redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 if length > 1:
                     for chunk in chunks[1:]:
                         i += 1
-                        res, _ = redcat.transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, False).execute()
+                        redcat.transaction.Transaction(b"echo " + chunk + f" >> {tmp_file}".encode(), self, True).execute()
                         redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
                 rfile = shlex.quote(rfile)
-                res, _ = redcat.transaction.Transaction(f"certutil -decode {tmp_file} {rfile}".encode(), self, False).execute()
-                res, _ = redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, False).execute()
-                error = ""
+                _, res, data = redcat.transaction.Transaction(f"certutil -decode {tmp_file} {rfile}".encode(), self, True).execute()
+                redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, True).execute()
+                if res:
+                    error = ""
+                else:
+                    error = redcat.style.bold("failed to upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
         return res, error

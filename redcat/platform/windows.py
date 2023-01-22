@@ -53,7 +53,7 @@ class Windows(Platform):
         with self.channel.transaction_lock:
             _, res, data = redcat.transaction.Transaction(f"type {rfile}".encode(), self, True).execute()
             if not res:
-                error = redcat.style.bold("can't download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                error = redcat.style.bold("can't download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
             else:
                 tmp_fname = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_").replace("=", "0") + ".tmp"
                 tmp_file = f"\"C:\\windows\\temp\\{tmp_fname}\""
@@ -64,9 +64,9 @@ class Windows(Platform):
                     if res:
                         data = base64.b64decode(data)
                     else:
-                        error = redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                        error = redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
                 else:
-                    redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                    redcat.style.bold("failed to download") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
         return res, error, data
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
@@ -89,7 +89,7 @@ class Windows(Platform):
             tmp_file = shlex.quote(tmp_file).replace("'", "\"")
             _, res, data = redcat.transaction.Transaction(f"echo \"\" > {tmp_file}".encode(), self, True).execute()
             if not res:
-                error = redcat.style.bold("can't upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                error = redcat.style.bold("can't upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
             else:
                 redcat.style.print_progress_bar(0, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 redcat.transaction.Transaction(b"echo " + chunks[0] + f" > {tmp_file}".encode(), self, True).execute()
@@ -108,5 +108,5 @@ class Windows(Platform):
                 if res:
                     error = ""
                 else:
-                    error = redcat.style.bold("failed to upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + style.bold(data.decode("utf-8"))
+                    error = redcat.style.bold("failed to upload") + redcat.style.bold(redcat.style.red(f"{rfile}: ")) + redcat.style.bold(data.decode("utf-8"))
         return res, error

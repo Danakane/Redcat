@@ -101,7 +101,7 @@ class Windows(Platform):
                         redcat.style.print_progress_bar(i, length, prefix = f"Upload {rfile}:", suffix = "Complete", length = 50)
                 print()
                 # decode the temporary file into the final file and delete the temporary file
-                rfile = shlex.quote(rfile).replace("'", "\"")
+                rfile = "\"" + rfile[1:-1] + "\""
                 _, res, data = redcat.transaction.Transaction(f"certutil -decode {tmp_file} {rfile}".encode(), self, True).execute()
                 redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, True).execute()
                 if res:

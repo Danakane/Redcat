@@ -1,17 +1,18 @@
 import typing
 
-PURPLE = '\033[95m'
-CYAN = '\033[96m'
-DARKCYAN = '\033[36m'
-BLUE = '\033[94m'
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-RED = '\033[91m'
-END = '\033[0m'
-BOLD = '\033[1m'
-UNDERLINE = '\033[4m'
-BOLDEND = '\033[22m'
-UNDERLINEEND = '\033[24m'
+PURPLE = "\001\033[95m\002"
+CYAN = "\001\033[96m\002"
+DARKCYAN = "\001\033[36m\002"
+BLUE = "\001\033[94m\002"
+GREEN = "\001\033[92m\002"
+YELLOW = "\001\033[93m\002"
+RED = "\001\033[91m\002"
+END = "\001\033[0m\002"
+BOLD = "\001\033[1m\002"
+UNDERLINE = "\001\033[4m\002"
+BOLDEND = "\001\033[22m\002"
+UNDERLINEEND = "\001\033[24m\002"
+
 
 def purple(string: str) -> str:
     return PURPLE + string + END
@@ -62,7 +63,7 @@ def tabulate(headers: typing.List[str], data: typing.List[typing.List[str]]) -> 
     return str_table
 
 # https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters?noredirect=1&lq=1
-def print_progress_bar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', print_end = "\r"):
+def print_progress_bar (iteration, total, prefix = "", suffix = "", decimals = 1, length = 100, fill = "█", print_end = "\r"):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -77,8 +78,8 @@ def print_progress_bar (iteration, total, prefix = '', suffix = '', decimals = 1
     """
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
     filled_length = int(length * iteration // total)
-    bar = fill * filled_length + '-' * (length - filled_length)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = print_end)
+    bar = fill * filled_length + "-" * (length - filled_length)
+    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end = print_end)
     # Print New Line on Complete
     if iteration == total: 
         print()

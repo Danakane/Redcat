@@ -47,7 +47,7 @@ class Platform(abc.ABC):
         return False, False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
-        return b"echo " + start + b";" + payload + b" && echo " + control + b"; echo " + end + b"\n"
+        return b"echo %b; %b && echo %b; echo %b\n" % (start, payload, control, end)
 
     def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bool, bytes]:
         return self.__chan.exec_transaction(buffer, start, end, handle_echo)

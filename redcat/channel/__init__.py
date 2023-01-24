@@ -9,14 +9,19 @@ from abc import abstractmethod
 
 import redcat.utils
 
-TCP: int = 0
+
+class ChannelProtocol(enum.Enum):
+    TCP: int = 0
+    SSL: int = 1
+
 
 class ChannelState(enum.Enum):
-    ERROR = -1
-    CLOSED = 0
-    OPEN = 1
-    OPENNING = 2
-    CLOSING = 3
+    ERROR: int = -1
+    CLOSED: int = 0
+    OPEN: int = 1
+    OPENNING: int = 2
+    CLOSING: int = 3
+
 
 class Channel(abc.ABC):
 

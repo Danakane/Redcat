@@ -9,15 +9,24 @@ import redcat.transaction
 
 class Session: 
 
-    def __init__(self, error_callback: typing.Callable, chan: redcat.channel.Channel = None, addr: str = None, port: int = None,
-                 channel_protocol:int=redcat.channel.TCP, platform_name: str=redcat.platform.LINUX) -> None:
-        self.__error_callback: typing.Callable = error_callback
+    def __init__(self, **kwargs: typing.Dict[str, typing.Any]) -> None:
+        """
+        error_callback: callable
+        chan: channel = None
+        platform_name: str = platform.LINUX
+        ...
+        """
+        self.__error_callback: typing.Callable = kwargs["error_callback"]
         self.__chan: redcat.channel.Channel = None
         self.__platform: redcat.platform.Platform = None
-        if chan:
-            self.__chan = chan
+        platform_name = kwargs["platform_name"]
+        del kwargs["error_callback"]
+        del kwargs["platform_name"]
+        if "chan" in kwargs.keys() and kwargs["chan"]:
+            self.__chan = kwargs["chan"]
+            del kwargs["chan"]
         else:
-            self.__chan = redcat.channel.factory.get_channel(addr, port, channel_protocol)
+            self.__chan = redcat.channel.factory.get_channel(**kwargs)
         if self.__chan:
             self.__chan.error_callback = self.on_error
             self.__platform = redcat.platform.factory.get_platform(self.__chan, platform_name)

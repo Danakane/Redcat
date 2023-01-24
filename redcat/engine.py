@@ -8,6 +8,7 @@ import os
 
 import redcat.style
 import redcat.command
+import redcat.platform
 import redcat.manager
 
 class Engine:
@@ -30,17 +31,27 @@ class Engine:
         cmd_clear = redcat.command.Command("clear", self.__clear, "clear the screen")
         self.__commands[cmd_clear.name] = cmd_clear
         # connect command
-        cmd_connect = redcat.command.Command("connect", self.__connect, "connect to a remote bind shell")
+        cmd_connect = redcat.command.Command("connect", self.__connect, "connect to a remote bind shell", self.__on_connect_completion)
         cmd_connect.add_argument("addr", type=str, nargs=1, help="address to connect")
         cmd_connect.add_argument("port", type=int, nargs=1, help="port to connect to")
         cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
+        cmd_connect.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], help="channel protocol (tcp or ssl)")
+        cmd_connect.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl client")
+        cmd_connect.add_argument("--key", type=str, nargs=1, help="path of private key of the client certificate")
+        cmd_connect.add_argument("--password", type=str, nargs=1, help="password of the private key")
+        cmd_connect.add_argument("--ca-cert", type=str, nargs=1, help="CA certificate of the ssl bind shell")
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
-        cmd_listen = redcat.command.Command("listen", self.__listen, "listen for a reverse shell")
+        cmd_listen = redcat.command.Command("listen", self.__listen, "listen for a reverse shell", self.__on_listen_completion)
         cmd_listen.add_argument("addr", type=str, nargs="?", help="address to bind")
         cmd_listen.add_argument("port", type=int, nargs=1, help="port to bind on")
         cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
         cmd_listen.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
+        cmd_listen.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], help="channel protocol (tcp or ssl)")
+        cmd_listen.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl shell listener")
+        cmd_listen.add_argument("--key", type=str, nargs=1, help="path of private key of the listener certificate")
+        cmd_listen.add_argument("--password", type=str, nargs=1, help="password of the private key")
+        cmd_listen.add_argument("--ca-cert", type=str, nargs=1, help="CA certificate of the ssl reverse shell")
         self.__commands[cmd_listen.name] = cmd_listen
         # kill command
         cmd_kill = redcat.command.Command("kill", self.__manager.kill, "kill the session or listener for a given id")
@@ -56,18 +67,21 @@ class Engine:
         cmd_session.parser.add_argument("id", type=str, nargs=1, help="id of session to select")
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
-        cmd_shell = redcat.command.Command("shell", self.__manager.remote_shell, "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
+        cmd_shell = redcat.command.Command("shell", self.__manager.remote_shell, 
+            "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
         cmd_shell.parser.add_argument("id", type=str, nargs="?", help="id of session to spawn")
         self.__commands[cmd_shell.name] = cmd_shell
         # download command
-        cmd_download = redcat.command.Command("download", self.__manager.download, "download a file from remote host for a given session id", self.__on_download_command_completion)
+        cmd_download = redcat.command.Command("download", self.__manager.download, "download a file from remote host for a given session id", 
+            self.__on_download_command_completion)
         cmd_download.parser.add_argument("rfile", type=str, nargs=1, help="remote file to download")
         cmd_download.parser.add_argument("lfile", type=str, nargs=1, help="local path for the downloaded file")
         cmd_download.parser.add_argument("id", type=str, nargs="?", help="id of the session")
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
-        cmd_upload = redcat.command.Command("upload", self.__manager.upload, "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)",
-                                     self.__on_upload_command_completion)
+        cmd_upload = redcat.command.Command("upload", self.__manager.upload, 
+            "upload a file from remote host for a given session id (extremely slow, not recommended for files bigger than a few 100kb)",
+            self.__on_upload_command_completion)
         cmd_upload.parser.add_argument("lfile", type=str, nargs=1, help="local file to upload")
         cmd_upload.parser.add_argument("rfile", type=str, nargs=1, help="remote path for the uploaded file")
         cmd_upload.parser.add_argument("id", type=str, nargs="?", help="id of the session")
@@ -143,6 +157,24 @@ class Engine:
             else:
                 items[i] = item + " "
         matches = [item for item in items if item and item.startswith(path)]
+        return matches
+
+    def __on_connect_completion(self, buffer, text) -> typing.List[str]:
+        matches = []
+        if " --protocol ssl " in buffer:
+            words = shlex.split(buffer)
+            previous = words[-2] if text else words[-1]
+            if previous in ["--cert", "--key", "--ca-cert"]:
+                matches = [f"{s}" for s in self.__complete_local_path(text) if s]
+        return matches
+
+    def __on_listen_completion(self, buffer, text) -> typing.List[str]:
+        matches = []
+        if " --protocol ssl " in buffer:
+            words = shlex.split(buffer)
+            previous = words[-2] if text else words[-1]
+            if previous in ["--cert", "--key", "--ca-cert"]:
+                matches = [f"{s}" for s in self.__complete_local_path(text) if s]
         return matches
 
     def __on_upload_command_completion(self, buffer, text) -> typing.List[str]:
@@ -225,22 +257,23 @@ class Engine:
             error = ""
         return res, error
 
-    def __connect(self, addr: str, port: int, platform: str = "") -> typing.Tuple[bool, str]:
+    def __connect(self, addr: str, port: int, platform: str = "", protocol: int=redcat.channel.ChannelProtocol.TCP) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.connect(addr, port, platform)
+            res, error = self.__manager.connect(addr=addr, port=port, platform_name=platform, protocol=protocol)
         else:
-            res, error = self.__manager.connect(addr, port)
+            res, error = self.__manager.connect(addr=addr, port=port, platform_name=redcat.platform.LINUX, protocol=protocol)
         return res, error
 
-    def __listen(self, port: int, addr: str = "", platform: str = "", background: bool = False) -> typing.Tuple[bool, str]:
+    def __listen(self, port: int, addr: str = "", platform: str = "", protocol: int=redcat.channel.ChannelProtocol.TCP, 
+        background: bool = False) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         if platform:
-            res, error = self.__manager.listen(addr, port, platform, background)
+            res, error = self.__manager.listen(addr=addr, port=port, platform_name=platform, protocol=protocol, background=background)
         else:
-            res, error = self.__manager.listen(addr, port, background=background)
+            res, error = self.__manager.listen(addr=addr, port=port, platform_name=redcat.platform.LINUX, protocol=protocol, background=background)
         return res, error
 
     def __show(self, type: str) -> typing.Tuple[bool, str]:

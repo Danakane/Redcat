@@ -4,14 +4,18 @@ import typing
 import redcat.channel, redcat.channel.tcpchannel
 
 
-def get_channel(addr: str, port: int, channel_protocol: int) -> redcat.channel.Channel:
+def get_channel(**kwargs: typing.Dict[str, typing.Any]) -> redcat.channel.Channel:
     chan = None
-    if channel_protocol == redcat.channel.TCP:
-        chan = redcat.channel.tcpchannel.TcpChannel(addr=addr, port=port)
-    return chan
-
-def get_channel_from_remote(host: typing.Tuple[typing.Any, ...], remote: typing.Any, channel_protocol: int) -> redcat.channel.Channel:
-    chan = None
-    if channel_protocol == redcat.channel.TCP:
-        chan = redcat.channel.tcpchannel.TcpChannel(host, remote)
+    protocol = kwargs["protocol"]
+    del kwargs["protocol"]
+    if protocol == redcat.channel.ChannelProtocol.TCP:
+        # addr: str, port: int
+        # OR
+        # remote: tuple, sock: socket
+        chan = redcat.channel.tcpchannel.TcpChannel(**kwargs)
+    elif protocol == redcat.channel.ChannelProtocol.SSL:
+        # addr: str, port: int, ca_cert: str, cert: str, key: str, password: str
+        # OR
+        # remote: tuple, sock: SSLSocket, ssl_context: SSLContext
+        chan = redcat.channel.sslchannel.SslChannel(**kwargs)
     return chan

@@ -74,7 +74,7 @@ class Manager:
             time.sleep(0.1)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
-        sess = redcat.session.Session(self.on_error, chan, platform_name=platform_name)
+        sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
         sess.open()
         id = None
         while sender.running:
@@ -96,18 +96,20 @@ class Manager:
                     sess.close()
                     sess = None
 
-    def listen(self, addr: str, port: int, platform_name: str = redcat.platform.LINUX, background: bool = False) -> typing.Tuple[bool, str]:
+    def listen(self, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
+        background = kwargs["background"]
+        del kwargs["background"]
         if not background:
             id = None
             chan = None
             sess = None
-            new_listener = redcat.listener.factory.get_listener(addr, port, platform_name)
+            new_listener = redcat.listener.factory.get_listener(**kwargs)
             try:
                 res, error, chan, platform_name = new_listener.listen_once()
                 if res and chan:
-                    sess = redcat.session.Session(self.on_error, chan, platform_name=platform_name)
+                    sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
                     sess.open()
                     if sess.wait_open():
                         with self.__lock_sessions:
@@ -133,17 +135,17 @@ class Manager:
                 res = True
                 error = ""
         else:
-            new_listener = redcat.listener.factory.get_listener(addr, port, platform_name, callback=self.__on_new_channel)
+            new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, **kwargs)
             with self.__lock_listeners:
                 self.__listeners[str(self.__listeners_last_id)] = new_listener
                 self.__listeners_last_id += 1
             res, error = new_listener.start()
         return res, error
 
-    def connect(self, addr: str, port: int, platform_name: str = redcat.platform.LINUX) -> typing.Tuple[bool, str]:
+    def connect(self, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
-        sess = redcat.session.Session(self.on_error, addr=addr, port=port, platform_name=platform_name)
+        sess = redcat.session.Session(error_callback=self.on_error, **kwargs)
         res, error = sess.open()
         id = None
         if res:

@@ -9,7 +9,7 @@ import redcat.transaction
 
 class Session: 
 
-    def __init__(self, error_callback: typing.Callable, platform_name: str, chan: redcat.channel.Channel=None, **kwargs: typing.Dict[str, typing.Any]) -> None:
+    def __init__(self, error_callback: typing.Callable, platform_name: str, chan: redcat.channel.Channel=None, **kwargs) -> None:
         self.__error_callback: typing.Callable = error_callback
         self.__chan: redcat.channel.Channel = None
         self.__platform: redcat.platform.Platform = None

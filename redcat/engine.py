@@ -34,8 +34,9 @@ class Engine:
         cmd_connect = redcat.command.Command("connect", self.__connect, "connect to a remote bind shell", self.__on_connect_completion)
         cmd_connect.add_argument("addr", type=str, nargs=1, help="address to connect")
         cmd_connect.add_argument("port", type=int, nargs=1, help="port to connect to")
-        cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
-        cmd_connect.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], help="channel protocol (tcp or ssl)")
+        cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], 
+            default=redcat.platform.LINUX, help="expected platform (linux or windows)")
+        cmd_connect.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol (tcp or ssl)")
         cmd_connect.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl client")
         cmd_connect.add_argument("--key", type=str, nargs=1, help="path of private key of the client certificate")
         cmd_connect.add_argument("--password", type=str, nargs=1, help="password of the private key")
@@ -43,11 +44,12 @@ class Engine:
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
         cmd_listen = redcat.command.Command("listen", self.__listen, "listen for a reverse shell", self.__on_listen_completion)
-        cmd_listen.add_argument("addr", type=str, nargs="?", help="address to bind")
+        cmd_listen.add_argument("addr", type=str, nargs="?", default="", help="address to bind")
         cmd_listen.add_argument("port", type=int, nargs=1, help="port to bind on")
-        cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], help="expected platform (linux or windows)")
-        cmd_listen.add_argument("-b", "--background", action="store_true", help="execute the listener in the background to handle multiple connections")
-        cmd_listen.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], help="channel protocol (tcp or ssl)")
+        cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], 
+            default=redcat.platform.LINUX, help="expected platform (linux or windows)")
+        cmd_listen.add_argument("-b", "--background", action="store_true", default=False, help="execute the listener in the background to handle multiple connections")
+        cmd_listen.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol (tcp or ssl)")
         cmd_listen.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl shell listener")
         cmd_listen.add_argument("--key", type=str, nargs=1, help="path of private key of the listener certificate")
         cmd_listen.add_argument("--password", type=str, nargs=1, help="password of the private key")
@@ -213,7 +215,7 @@ class Engine:
                 error = redcat.style.bold(f"{message}: command ") + redcat.style.bold(redcat.style.red(f"{cmd}"))
         return res, error
 
-    def __system(self, args):
+    def __system(self, sender: argparse.ArgumentParser, args):
         cmd = ""
         if args:
             if isinstance(args, list) and len(args) > 1:
@@ -230,16 +232,16 @@ class Engine:
                 pass
         return True, ""
 
-    def __exit(self) -> typing.Tuple[bool, str]:
+    def __exit(self, sender: argparse.ArgumentParser) -> typing.Tuple[bool, str]:
         self.__running = False
         self.__manager.clear()
         return True, ""
 
-    def __clear(self) -> typing.Tuple[bool, str]:     
+    def __clear(self, sender: argparse.ArgumentParser) -> typing.Tuple[bool, str]:     
         subprocess.run("clear")
         return True, ""
 
-    def __help(self, name: str = "") -> typing.Tuple[bool, str]:
+    def __help(self, sender: argparse.ArgumentParser, name: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.red(f"{name}"))
         if name:
@@ -257,26 +259,32 @@ class Engine:
             error = ""
         return res, error
 
-    def __connect(self, addr: str, port: int, platform: str = "", protocol: int=redcat.channel.ChannelProtocol.TCP) -> typing.Tuple[bool, str]:
+    def __connect(self, sender: argparse.ArgumentParser, protocol: str, platform: str, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = True
         error = ""
-        if platform:
-            res, error = self.__manager.connect(addr=addr, port=port, platform_name=platform, protocol=protocol)
-        else:
-            res, error = self.__manager.connect(addr=addr, port=port, platform_name=redcat.platform.LINUX, protocol=protocol)
+        protocol_code = redcat.channel.ChannelProtocol.TCP
+        if protocol == "ssl":
+            protocol_code = redcat.channel.ChannelProtocol.SSL
+        elif "cert" in kwargs.keys() or "key" in kwargs.keys() or "password" in kwargs.keys() or "ca_cert" in kwargs.keys():
+            sender.error("listen command doesn't accept --cert, --key, --password and --ca-cert flags when not using --protocol ssl")  
+        res, error = self.__manager.connect(protocol=protocol_code, platform_name=platform, **kwargs)
         return res, error
 
-    def __listen(self, port: int, addr: str = "", platform: str = "", protocol: int=redcat.channel.ChannelProtocol.TCP, 
-        background: bool = False) -> typing.Tuple[bool, str]:
+    def __listen(self, sender: argparse.ArgumentParser, background: bool, protocol: str, platform: str,
+        **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = True
         error = ""
-        if platform:
-            res, error = self.__manager.listen(addr=addr, port=port, platform_name=platform, protocol=protocol, background=background)
-        else:
-            res, error = self.__manager.listen(addr=addr, port=port, platform_name=redcat.platform.LINUX, protocol=protocol, background=background)
+        protocol_code = redcat.channel.ChannelProtocol.TCP
+        if protocol == "ssl":
+            protocol_code = redcat.channel.ChannelProtocol.SSL
+            if not ("cert" in kwargs.keys() and "key" in kwargs.keys()) and sender:
+                sender.error("listen command requires --cert and --key flags when using --protocol ssl")
+        elif "cert" in kwargs.keys() or "key" in kwargs.keys() or "password" in kwargs.keys() or "ca_cert" in kwargs.keys():
+            sender.error("listen command doesn't accept --cert, --key, --password and --ca-cert flags when not using --protocol ssl") 
+        res, error = self.__manager.listen(background=background, protocol=protocol_code, platform_name=platform, **kwargs)
         return res, error
 
-    def __show(self, type: str) -> typing.Tuple[bool, str]:
+    def __show(self, sender: argparse.ArgumentParser, type: str) -> typing.Tuple[bool, str]:
         res, error, serialization = self.__manager.show(type)
         data = []
         if res:
@@ -323,7 +331,7 @@ class Engine:
                     print(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
             except EOFError:
                 if self.__manager.selected_id:
-                    self.__manager.remote_shell()
+                    self.__manager.remote_shell(sender=None)
             except KeyboardInterrupt:
                 print()
             except SystemExit:

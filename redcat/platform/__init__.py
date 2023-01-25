@@ -52,7 +52,7 @@ class Platform(abc.ABC):
     def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bool, bytes]:
         return self.__chan.exec_transaction(buffer, start, end, handle_echo)
 
-    def send_cmd(self, cmd: str, wait_for: int = 0.05) -> typing.Tuple[bool, str]:
+    def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
         res, error = self.channel.send(f"{cmd}\n".encode())
         time.sleep(wait_for)
         return res, error

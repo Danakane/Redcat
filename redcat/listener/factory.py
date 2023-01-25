@@ -1,12 +1,10 @@
 import typing
 
 import redcat.channel
-import redcat.listener, redcat.listener.tcplistener
+import redcat.listener, redcat.listener.tcplistener, redcat.listener.ssllistener
 
-def get_listener(**kwargs: typing.Dict[str, typing.Any]) -> redcat.listener.Listener:
+def get_listener(protocol: int, **kwargs: typing.Dict[str, typing.Any]) -> redcat.listener.Listener:
     new_listener = None
-    protocol = kwargs["protocol"]
-    del kwargs["protocol"]
     if protocol == redcat.channel.ChannelProtocol.TCP:
         # addr: str, port: int, platform_name: str, callback: callable
         new_listener = redcat.listener.tcplistener.TcpListener(**kwargs)

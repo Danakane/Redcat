@@ -1,13 +1,11 @@
 import threading
 import typing
 
-import redcat.channel, redcat.channel.tcpchannel
+import redcat.channel, redcat.channel.tcpchannel, redcat.channel.sslchannel
 
 
-def get_channel(**kwargs: typing.Dict[str, typing.Any]) -> redcat.channel.Channel:
+def get_channel(protocol: int, **kwargs: typing.Dict[str, typing.Any]) -> redcat.channel.Channel:
     chan = None
-    protocol = kwargs["protocol"]
-    del kwargs["protocol"]
     if protocol == redcat.channel.ChannelProtocol.TCP:
         # addr: str, port: int
         # OR

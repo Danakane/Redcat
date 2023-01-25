@@ -1,3 +1,4 @@
+import argparse
 import time
 import typing
 import threading
@@ -69,7 +70,7 @@ class Manager:
             with self.__lock_broken_sessions:
                 if len(self.__broken_sessions) > 0:
                     for id in self.__broken_sessions:
-                        self.kill("session", id)
+                        self.kill(None, "session", id)
                 self.__broken_sessions.clear()
             time.sleep(0.1)
 
@@ -96,36 +97,40 @@ class Manager:
                     sess.close()
                     sess = None
 
-    def listen(self, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
+    def listen(self, background: bool=True, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
-        background = kwargs["background"]
-        del kwargs["background"]
         if not background:
             id = None
             chan = None
             sess = None
-            new_listener = redcat.listener.factory.get_listener(**kwargs)
+            new_listener = None
             try:
-                res, error, chan, platform_name = new_listener.listen_once()
-                if res and chan:
-                    sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
-                    sess.open()
-                    if sess.wait_open():
-                        with self.__lock_sessions:
-                            id = str(self.__sessions_last_id)
-                            self.__sessions[id] = sess
-                            self.__sessions_last_id += 1
-                            if not self.__selected_session:
-                                self.__selected_session = sess
-                                self.__selected_id = id
-            except KeyboardInterrupt:
-                if sess:
-                    sess.stop()
-                    sess.close()
-                    sess = None
-                    if id != -1 and id in self.__sessions.keys():
-                        del self.__sessions[id]
+                new_listener = redcat.listener.factory.get_listener(**kwargs)
+            except Exception as err:
+                error = redcat.utils.get_error(err)
+                new_listener = None
+            if new_listener:
+                try:
+                    res, error, chan, platform_name = new_listener.listen_once()
+                    if res and chan:
+                        sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
+                        sess.open()
+                        if sess.wait_open():
+                            with self.__lock_sessions:
+                                id = str(self.__sessions_last_id)
+                                self.__sessions[id] = sess
+                                self.__sessions_last_id += 1
+                                if not self.__selected_session:
+                                    self.__selected_session = sess
+                                    self.__selected_id = id
+                except KeyboardInterrupt:
+                    if sess:
+                        sess.stop()
+                        sess.close()
+                        sess = None
+                        if id != -1 and id in self.__sessions.keys():
+                            del self.__sessions[id]
             if sess:
                 sess.interactive(True, id) 
                 sess.start()
@@ -135,50 +140,62 @@ class Manager:
                 res = True
                 error = ""
         else:
-            new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, **kwargs)
-            with self.__lock_listeners:
-                self.__listeners[str(self.__listeners_last_id)] = new_listener
-                self.__listeners_last_id += 1
-            res, error = new_listener.start()
+            new_listener = None
+            try:
+                new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, **kwargs)
+            except Exception as err:
+                error = redcat.utils.get_error(err)
+                new_listener = None
+            if new_listener:
+                with self.__lock_listeners:
+                    self.__listeners[str(self.__listeners_last_id)] = new_listener
+                    self.__listeners_last_id += 1
+                res, error = new_listener.start()
         return res, error
 
     def connect(self, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
-        sess = redcat.session.Session(error_callback=self.on_error, **kwargs)
-        res, error = sess.open()
-        id = None
-        if res:
-            try:
-                if sess.wait_open():
-                    with self.__lock_sessions:
-                        id = str(self.__sessions_last_id)
-                        self.__sessions[id] = sess
-                        self.__sessions_last_id += 1
-                        if not self.__selected_session:
-                            self.__selected_session = sess
-                            self.__selected_id = id
-            except KeyboardInterrupt:
-                res = False
-                error = redcat.style.bold("failed to create session")
+        sess = None
+        try:
+            sess = redcat.session.Session(error_callback=self.on_error, **kwargs)
+        except Exception as err:
+            error = redcat.utils.get_error(err)
+            sess = None
+        if sess:
+            res, error = sess.open()
+            id = None
+            if res:
+                try:
+                    if sess.wait_open():
+                        with self.__lock_sessions:
+                            id = str(self.__sessions_last_id)
+                            self.__sessions[id] = sess
+                            self.__sessions_last_id += 1
+                            if not self.__selected_session:
+                                self.__selected_session = sess
+                                self.__selected_id = id
+                except KeyboardInterrupt:
+                    res = False
+                    error = redcat.style.bold("failed to create session")
+                    if sess:
+                        sess.stop()
+                        sess.close()
+                        sess = None
+                        if id != -1 and id in self.__sessions.keys():
+                            del self.__sessions[id]
                 if sess:
-                    sess.stop()
-                    sess.close()
-                    sess = None
-                    if id != -1 and id in self.__sessions.keys():
-                        del self.__sessions[id]
-            if sess:
-                sess.interactive(True, id) 
-                sess.start()
-                sess.wait_stop()
-                sess.interactive(False)
-                print()
-                res = True
-                error = ""
+                    sess.interactive(True, id) 
+                    sess.start()
+                    sess.wait_stop()
+                    sess.interactive(False)
+                    print()
+                    res = True
+                    error = ""
         return res, error
 
     # kill a session or a listener
-    def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
+    def kill(self, sender: argparse.ArgumentParser, type: str, id: str) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
         if type == "session":
@@ -205,7 +222,7 @@ class Manager:
                     error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
 
-    def select_session(self, id: str) -> typing.Tuple[int, str]:
+    def select_session(self, sender: argparse.ArgumentParser, id: str) -> typing.Tuple[int, str]:
         res = False
         error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         if id == "none":
@@ -220,7 +237,7 @@ class Manager:
             error = ""
         return res, error
 
-    def remote_shell(self, id: str = "") -> typing.Tuple[bool, str]:
+    def remote_shell(self, sender: argparse.ArgumentParser, id: str = "") -> typing.Tuple[bool, str]:
         res = False 
         if not id:
             id = self.__selected_id
@@ -269,7 +286,7 @@ class Manager:
             info = f"session {id}: {sess.user}@{sess.hostname}"
         return info
 
-    def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
+    def download(self, sender: argparse.ArgumentParser, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("download operation failed")
         rfile = shlex.quote(rfile) # to avoid remote command injection though it's kinda useless
@@ -295,7 +312,7 @@ class Manager:
                 error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
  
-    def upload(self, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
+    def upload(self, sender: argparse.ArgumentParser, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("upload operation failed")
         if not id:

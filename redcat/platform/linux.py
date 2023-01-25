@@ -52,6 +52,16 @@ class Linux(Platform):
             data = b"" # if failure return empty string
         return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "")
 
+    def disable_history(self, handle_echo: bool=True) -> typing.Tuple[bool, bool, str]:
+        self.channel.purge()
+        self.send_cmd("set +o history")
+        res, cmd_success, data = redcat.transaction.Transaction(
+            "unset HISTFILE && export HISTCONTROL=ignorespace && unset PROMPT_COMMAND".encode(), 
+            self, handle_echo).execute()
+        if not cmd_success:
+            data = b"" # if failure return empty string
+        return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "")
+
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         res = False
         error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
@@ -114,8 +124,7 @@ class Linux(Platform):
 
     def get_pty(self) -> bool:
         got_pty: bool = False
-        res, _ = self.send_cmd("set +o history") # disable history
-        time.sleep(0.1)
+        self.disable_history(handle_echo=False) # disable history (don't have pty yet, so no echo)
         best_shell = "sh"
         pty_options = [ 
             (["script"], "{binary_path} -qc {shell} /dev/null 2>&1\n"),
@@ -139,7 +148,9 @@ class Linux(Platform):
                 _, cmd_success, resp = self.which(binary, False) # don't have pty yet, so no echo
                 if cmd_success and binary in resp:
                     payload = payload_format.format(binary_path=binary, shell=best_shell)
-                    got_pty, _ = self.send_cmd(payload) 
+                    got_pty, _ = self.send_cmd(payload)
+                    self.disable_history()
+                    #self.send_cmd("set +o history")
                     break
             if got_pty:
                 self.__got_pty = got_pty
@@ -156,7 +167,8 @@ class Linux(Platform):
             if not self.__interactive:
                 self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
                 tty.setraw(sys.stdin.fileno())
-            res, _ = self.send_cmd("set +o history")
+            #res, _ = self.send_cmd("set +o history")
+            self.disable_history(handle_echo=False)
             term = os.environ.get("TERM", "xterm")
             columns, rows = os.get_terminal_size(0) 
             payload = (
@@ -183,15 +195,17 @@ class Linux(Platform):
                         best_shell = shell
                         break
                 res, _ = self.send_cmd(best_shell) 
-                res, _ = self.send_cmd("set +o history")
+                self.disable_history(handle_echo=False) # Don't handle echo here, shell prompt ansi escape sequence can corrupt the base64 string in the echo
+                #res, _ = self.send_cmd("set +o history")
                 prompt = Linux.PROMPTS["default"]
                 if best_shell in Linux.PROMPTS.keys():
                     prompt = Linux.PROMPTS[best_shell]
                 prompt = prompt.replace("remote", f"session {session_id}")
-                self.send_cmd(f"export PS1={prompt}")
+                redcat.transaction.Transaction(f"export PS1={prompt}".encode(), self, True).execute()
+                #self.send_cmd(f"export PS1={prompt}")
             if res:
-                self.channel.wait_data(0.1)
-                time.sleep(0.2)
+                self.channel.wait_data(1)
+                time.sleep(0.5)
                 self.channel.purge()
                 res, _ = self.channel.send(b"\n")
             if res:
@@ -209,9 +223,9 @@ class Linux(Platform):
                 # use sh shell when backgrounded
                 # we can't just call exit because user may have called another shell
                 res, _ = self.send_cmd("sh")
-                res, _ = self.send_cmd("set +o history")
+                res, _, _ = self.disable_history()
                 res, _ = self.send_cmd("unset PS1") # remove prompt
-                self.channel.wait_data(0.1)
+                self.channel.wait_data(1)
                 time.sleep(0.2)
                 self.channel.purge()
             self.__interactive = False

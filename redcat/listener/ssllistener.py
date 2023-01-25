@@ -1,4 +1,5 @@
 import typing
+import select
 import ssl
 
 import redcat.channel
@@ -18,12 +19,19 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
             self.__ssl_context.load_verify_locations(ca_cert)
             self.__ssl_context.verify_mode
 
+    def on_start(self) -> typing.Tuple[bool, str]:
+        res, error = super().on_start()
+        if res:
+            ssock = self.__ssl_context.wrap_socket(self._sock, server_side=True)
+            self._sock.close()
+            self._sock = ssock
+        return res, error
+
     def listen(self) -> redcat.channel.Channel:
         chan = None
         readables, _, _ = select.select([self._sock], [], [], 0.1)
         if readables:
-            with context.wrap_socket(self._sock, server_side=True) as ssock: 
-                sock, remote = ssock.accept()
-                chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, 
-                    protocol=redcat.channel.ChannelProtocol.SSL, ssl_context=self.__ssl_context)
+            sock, remote = self._sock.accept()
+            chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, 
+                protocol=redcat.channel.ChannelProtocol.SSL, ssl_context=self.__ssl_context)
         return chan

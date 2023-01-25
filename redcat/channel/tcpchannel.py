@@ -48,7 +48,7 @@ class TcpChannel(redcat.channel.Channel):
                 res = True
                 error = ""
             except Exception as err:
-                error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
+                error = redcat.utils.get_error(err)
         else:
             res = True
             error = ""
@@ -92,7 +92,7 @@ class TcpChannel(redcat.channel.Channel):
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:
-                        error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
+                        error = error = redcat.utils.get_error(err)
                         res = False
             except select.error as err:
                 res = False
@@ -107,7 +107,7 @@ class TcpChannel(redcat.channel.Channel):
             res = True
             error = ""
         except Exception as err:
-            error =  redcat.style.bold(": ".join(str(arg) for arg in err.args))
+            error = redcat.utils.get_error(err)
         return res, error
 
 

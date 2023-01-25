@@ -109,7 +109,7 @@ class Command:
             try:
                 parsed_args = self.__parser.parse_args(arguments)
                 kwargs = {k:v[0] if isinstance(v, list) and len(v) == 1 else v for k,v in parsed_args._get_kwargs() if v is not None}
-                res, error = self.__fct(**kwargs)
+                res, error = self.__fct(self.parser, **kwargs)
             except SystemExit:
                 res = True
                 error = ""

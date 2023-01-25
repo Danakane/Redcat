@@ -59,6 +59,9 @@ class TcpListener(redcat.listener.Listener):
         chan = None
         readables, _, _ = select.select([self._sock], [], [], 0.1)
         if readables:
-            sock, remote = self._sock.accept()
-            chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, protocol=redcat.channel.ChannelProtocol.TCP)
+            try:
+                sock, remote = self._sock.accept()
+                chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, protocol=redcat.channel.ChannelProtocol.TCP)
+            except:
+                chan = None # TODO: Think about a way to report this error
         return chan

@@ -2,6 +2,7 @@ import typing
 import select
 import ssl
 
+import redcat.utils
 import redcat.channel
 import redcat.listener.tcplistener
 
@@ -35,7 +36,10 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
         chan = None
         readables, _, _ = select.select([self._sock], [], [], 0.1)
         if readables:
-            sock, remote = self._sock.accept()
-            chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, 
-                protocol=redcat.channel.ChannelProtocol.SSL, ssl_context=self.__ssl_context)
+            try:
+                sock, remote = self._sock.accept()
+                chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, 
+                    protocol=redcat.channel.ChannelProtocol.SSL, ssl_context=self.__ssl_context)
+            except:
+                chan = None # TODO: Think about a way to report this error
         return chan

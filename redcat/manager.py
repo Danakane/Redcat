@@ -283,7 +283,10 @@ class Manager:
             id = self.__selected_id
         if id in self.__sessions.keys():
             sess = self.__sessions[id]
-            info = f"session {id}: {sess.user}@{sess.hostname}"
+            try:
+                info = f"session {id}: {sess.user}@{sess.hostname}"
+            except:
+                info = ""
         return info
 
     def download(self, sender: argparse.ArgumentParser, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:

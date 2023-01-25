@@ -12,44 +12,47 @@ import redcat.channel
 
 class TcpChannel(redcat.channel.Channel):
 
-    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None) -> None:
-        super().__init__()
-        self.__remote: typing.Tuple[typing.Any, ...] = None
-        self.__sock: socket.socket = None
-        self.__addr: str = None
-        self.__port: int = None
-        self.__error: str = ""
+    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._remote: typing.Tuple[typing.Any, ...] = None
+        self._sock: socket.socket = None
+        self._addr: str = None
+        self._port: int = None
         if remote and sock:
-            self.__remote = remote
-            self.__sock = sock
+            self._remote = remote
+            self._sock = sock
         else:
-            self.__addr = addr
-            self.__port = port
+            self._addr = addr
+            self._port = port
 
     @property
     def remote(self) -> str:
         res = ""
-        if self.__remote:
-            res = f"@{self.__remote[0]}:{self.__remote[1]}"
+        if self._remote:
+            res = f"@{self._remote[0]}:{self._remote[1]}"
         return res
+
+    @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return redcat.channel.ChannelProtocol.TCP, "tcp"
          
     def connect(self) -> typing.Tuple[bool, str]:
         res = False
         error = "Failed to create session"
-        if not self.__sock:
+        if not self._sock:
             try:
                 protocol = socket.AF_INET
-                endpoint = (self.__addr, self.__port)
-                if redcat.utils.valid_ip_address(self.__addr) == socket.AF_INET6:
-                    endpoint = (self.__addr, self.__port, 0, 0)
+                endpoint = (self._addr, self._port)
+                if redcat.utils.valid_ip_address(self._addr) == socket.AF_INET6:
+                    endpoint = (self._addr, self._port, 0, 0)
                     protocol = socket.AF_INET6
-                self.__sock = socket.socket(protocol, socket.SOCK_STREAM)
-                self.__sock.connect(endpoint)
-                self.__remote = endpoint
+                self._sock = socket.socket(protocol, socket.SOCK_STREAM)
+                self._sock.connect(endpoint)
+                self._remote = endpoint
                 res = True
                 error = ""
             except Exception as err:
-                error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
+                error = redcat.utils.get_error(err)
         else:
             res = True
             error = ""
@@ -59,22 +62,19 @@ class TcpChannel(redcat.channel.Channel):
         return self.connect()
 
     def on_close(self) -> None:
-        if self.__sock:
+        if self._sock:
             try:
-                self.__sock.shutdown(socket.SHUT_RDWR)
-                self.__sock.close() 
+                self._sock.shutdown(socket.SHUT_RDWR)
+                self._sock.close() 
             except:
                 pass
             finally:
-                self.__sock = None
+                self._sock = None
 
     def on_connection_established(self) -> None:
         if self.is_open:
-            print(f"Connected to remote {self.__remote[0]}:{self.__remote[1]}", end="")
+            print(f"Connected to remote {self._remote[0]}:{self._remote[1]}", end="")
             sys.stdout.flush()
-
-    def on_error(self, error: str) -> None:
-        pass
 
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         res = False
@@ -83,17 +83,17 @@ class TcpChannel(redcat.channel.Channel):
         if self.is_open:
             try:
                 res = True
-                readables, _, _= select.select([self.__sock], [], [], 0.05)
-                if readables and readables[0] == self.__sock:
+                readables, _, _= select.select([self._sock], [], [], 0.05)
+                if readables and readables[0] == self._sock:
                     try:
-                        data = self.__sock.recv(4096)
+                        data = self._sock.recv(4096)
                         if len(data) == 0:
                             res = False
-                            error = redcat.style.bold(f"Connection with remote @{self.__remote[0]}:{self.__remote[1]} broken")
+                            error = redcat.style.bold(f"Connection with remote @{self._remote[0]}:{self._remote[1]} broken")
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:
-                        error = redcat.style.bold(": ".join(str(arg) for arg in err.args))
+                        error = error = redcat.utils.get_error(err)
                         res = False
             except select.error as err:
                 res = False
@@ -104,11 +104,11 @@ class TcpChannel(redcat.channel.Channel):
         res = False
         error = ""
         try:
-            self.__sock.send(data)
+            self._sock.send(data)
             res = True
             error = ""
         except Exception as err:
-            error =  redcat.style.bold(": ".join(str(arg) for arg in err.args))
+            error = redcat.utils.get_error(err)
         return res, error
 
 

@@ -1,4 +1,5 @@
 import time
+import threading
 import typing
 import abc
 from abc import abstractmethod
@@ -16,6 +17,7 @@ class Platform(abc.ABC):
     def __init__(self, chan: redcat.channel.Channel, platform_name) -> None:
         self.__chan: redcat.channel.Channel = chan
         self.__platform_name: str = platform_name.lower()
+        self.__lock: threading.Lock = threading.Lock()
 
     @property
     def platform_name(self) -> str:
@@ -49,12 +51,22 @@ class Platform(abc.ABC):
     def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
         return b"echo %b; %b && echo %b; echo %b\n" % (start, payload, control, end)
 
-    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bool, bytes]:
-        return self.__chan.exec_transaction(buffer, start, end, handle_echo)
+    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+        res = False
+        data = b""
+        if self.__chan.is_open:
+            res, data = self.__chan.exec_transaction(buffer, start, end, handle_echo)
+        return res, data
 
-    def send_cmd(self, cmd: str, wait_for: int = 0.05) -> typing.Tuple[bool, str]:
+    def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
         res, error = self.channel.send(f"{cmd}\n".encode())
         time.sleep(wait_for)
         return res, error
-   
 
+    def _with_lock(func: typing.Callable) -> typing.Callable:
+        def decorator(self, *args, **kwargs) -> typing.Any:
+            res = None
+            with self.__lock:
+                res = func(self, *args, **kwargs)
+            return res
+        return decorator

@@ -7,8 +7,9 @@ import redcat.channel
 
 class Listener:
 
-    def __init__(self, platform_name: str, callback: typing.Callable = None) -> None:
+    def __init__(self, platform_name: str, callback: typing.Callable = None, error_callback: typing.Callable = None) -> None:
         self.__callback: typing.Callable = callback
+        self.__error_callback: typing.Callable = error_callback
         self.__platform_name: str = platform_name
         self.__thread: threading.Thread = None
         self.__stop_evt: threading.Event = threading.Event()
@@ -17,6 +18,19 @@ class Listener:
     @abstractmethod
     def endpoint(self) -> str:
         pass
+
+    @property
+    @abstractmethod
+    def protocol(self) -> typing.Tuple[int, str]:
+        pass
+
+    @property
+    def platform_name(self) -> str:
+        return self.__platform_name
+
+    @property
+    def running(self) -> bool:
+        return not self.__stop_evt.is_set()
 
     @abstractmethod
     def listen(self) -> redcat.channel.Channel:
@@ -30,13 +44,11 @@ class Listener:
     def on_stop(self) -> None:
         pass
 
-    @property
-    def platform_name(self) -> str:
-        return self.__platform_name
+    def on_error(self, error: str) -> None:
+        pass
 
-    @property
-    def running(self) -> bool:
-        return not self.__stop_evt.is_set()
+    def build_channel(self, protocol: int, **kwargs) -> redcat.channel.Channel:
+        return redcat.channel.factory.get_channel(protocol=protocol, **kwargs)
 
     def start(self) -> typing.Tuple[bool, str]:
         self.__stop_evt.clear()
@@ -44,6 +56,8 @@ class Listener:
         if res:
             self.__thread = threading.Thread(target=self.__run)
             self.__thread.start()
+        else:
+            self.__error_callback(self, error)
         return res, error
 
     def stop(self) -> None:
@@ -51,6 +65,11 @@ class Listener:
         if self.__thread:
             self.__thread.join()
         self.on_stop()
+
+    def error(self, err: str) -> None:
+        self.on_error(err)
+        if self.__error_callback:
+            self.__error_callback(self, err)
 
     def __run(self) -> None:
         while not self.__stop_evt.is_set():
@@ -61,8 +80,9 @@ class Listener:
     def listen_once(self) -> typing.Tuple[bool, str, redcat.channel.Channel, str]:
         chan: redcat.channel.Channel = None
         res, error = self.on_start()
-        while not chan:
-            chan = self.listen()
+        if res:
+            while not chan:
+                chan = self.listen()
         self.on_stop()
         return res, error, chan, self.__platform_name
 

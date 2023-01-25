@@ -1,6 +1,7 @@
 import socket
 import ipaddress
 
+import redcat.style
 
 def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) -> None:
     start_index = 0
@@ -25,3 +26,6 @@ def valid_ip_address(addr: str) -> int:
     except ValueError:
         pass
     return res
+
+def get_error(err: Exception) -> str:
+    return redcat.style.bold(": ".join(str(arg) for arg in err.args))

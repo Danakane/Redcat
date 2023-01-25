@@ -35,6 +35,11 @@ class Listener:
         return self.__platform_name
 
     @property
+    @abstractmethod
+    def protocol(self) -> typing.Tuple[int, str]:
+        pass
+
+    @property
     def running(self) -> bool:
         return not self.__stop_evt.is_set()
 

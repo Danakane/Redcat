@@ -26,6 +26,10 @@ class TcpListener(redcat.listener.Listener):
     def endpoint(self) -> str:
          return f"@{self._endpoint[0]}:{self._endpoint[1]}"
 
+    @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return redcat.channel.ChannelProtocol.TCP, "tcp"
+
     def on_start(self) -> typing.Tuple[bool, str]:
         res = False
         error = "Failed to start the listener"

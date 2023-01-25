@@ -27,6 +27,9 @@ class SslChannel(redcat.channel.tcpchannel.TcpChannel):
             if self.__cert:
                 self.__ssl_context.load_cert_chain(self.__cert, self.__key, self.__password)
             
+    @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return redcat.channel.ChannelProtocol.SSL, "ssl"
 
     def connect(self) -> typing.Tuple[bool, str]:
         res = False

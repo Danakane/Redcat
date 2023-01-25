@@ -19,6 +19,10 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
             self.__ssl_context.load_verify_locations(ca_cert)
             self.__ssl_context.verify_mode
 
+    @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return redcat.channel.ChannelProtocol.SSL, "ssl"
+
     def on_start(self) -> typing.Tuple[bool, str]:
         res, error = super().on_start()
         if res:

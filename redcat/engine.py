@@ -293,11 +293,11 @@ class Engine:
                 if row:
                     data.append(row.split(","))
             if type == "sessions":
-                headers = ["ID", "User", "Remote host", "End point", "Platform"]
+                headers = ["ID", "User", "Remote host", "End point", "Protocol", "Platform"]
                 print("\n" + redcat.style.tabulate(headers, data) + "\n")
                 res = True
             elif type == "listeners":
-                headers = ["ID", "End point", "Expected platform"]
+                headers = ["ID", "End point", "Protocol", "Expected platform"]
                 print("\n" + redcat.style.tabulate(headers, data) + "\n")
                 res = True
         return res, error

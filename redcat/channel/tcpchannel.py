@@ -31,6 +31,10 @@ class TcpChannel(redcat.channel.Channel):
         if self._remote:
             res = f"@{self._remote[0]}:{self._remote[1]}"
         return res
+
+    @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return redcat.channel.ChannelProtocol.TCP, "tcp"
          
     def connect(self) -> typing.Tuple[bool, str]:
         res = False

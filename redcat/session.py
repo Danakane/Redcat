@@ -59,6 +59,10 @@ class Session:
         return self.__platform
 
     @property
+    def protocol(self) -> typing.Tuple[int, str]:
+        return self.__chan.protocol
+
+    @property
     def is_open(self) -> bool:
         return self.__chan.is_open
 

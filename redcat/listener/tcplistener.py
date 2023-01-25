@@ -10,8 +10,8 @@ import redcat.listener
 
 class TcpListener(redcat.listener.Listener):
 
-    def __init__(self, addr: str, port: int, platform_name: str, callback: typing.Callable = None) -> None:
-        super().__init__(platform_name, callback)
+    def __init__(self, addr: str, port: int, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._endpoint: typing.Tuple[typing.Any] = None
         self._protocol: int = socket.AF_INET
         if redcat.utils.valid_ip_address(addr) == socket.AF_INET:
@@ -61,7 +61,7 @@ class TcpListener(redcat.listener.Listener):
         if readables:
             try:
                 sock, remote = self._sock.accept()
-                chan = redcat.channel.factory.get_channel(remote=remote, sock=sock, protocol=redcat.channel.ChannelProtocol.TCP)
+                chan = self.build_channel(protocol=redcat.channel.ChannelProtocol.TCP, remote=remote, sock=sock)
             except:
                 chan = None # TODO: Think about a way to report this error
         return chan

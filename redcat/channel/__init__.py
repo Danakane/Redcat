@@ -25,7 +25,7 @@ class ChannelState(enum.Enum):
 
 class Channel(abc.ABC):
 
-    def __init__(self) -> None:
+    def __init__(self, error_callback: typing.Callable = None) -> None:
         self.__thread: threading.Thread = None
         self.__state: int = ChannelState.CLOSED
         self.__stop_evt: threading.Event = threading.Event()
@@ -34,7 +34,7 @@ class Channel(abc.ABC):
         self.__dataqueue: typing.Queue = queue.Queue()
         self.__queue_lock: threading.Lock = threading.Lock()
         self.__transaction_lock: threading.RLock = threading.RLock()
-        self.__error_callback: typing.Callable = None
+        self.__error_callback: typing.Callable = error_callback
 
     @property
     def is_open(self) -> bool:
@@ -86,7 +86,6 @@ class Channel(abc.ABC):
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         pass
 
-    @abstractmethod
     def on_error(self) -> None:
         pass
 

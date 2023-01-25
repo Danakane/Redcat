@@ -1,4 +1,5 @@
 import time
+import threading
 import typing
 import abc
 from abc import abstractmethod
@@ -16,6 +17,7 @@ class Platform(abc.ABC):
     def __init__(self, chan: redcat.channel.Channel, platform_name) -> None:
         self.__chan: redcat.channel.Channel = chan
         self.__platform_name: str = platform_name.lower()
+        self.__lock: threading.Lock = threading.Lock()
 
     @property
     def platform_name(self) -> str:
@@ -60,5 +62,11 @@ class Platform(abc.ABC):
         res, error = self.channel.send(f"{cmd}\n".encode())
         time.sleep(wait_for)
         return res, error
-   
 
+    def _with_lock(func: typing.Callable) -> typing.Callable:
+        def decorator(self, *args, **kwargs) -> typing.Any:
+            res = None
+            with self.__lock:
+                res = func(self, *args, **kwargs)
+            return res
+        return decorator

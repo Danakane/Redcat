@@ -18,6 +18,8 @@ class Manager:
         self.__sessions: typing.Dict[str, redcat.session.Session] = {}
         self.__lock_broken_sessions: threading.Lock = threading.Lock()
         self.__broken_sessions: typing.List[str] = []
+        self.__lock_broken_listeners: threading.Lock = threading.Lock()
+        self.__broken_listeners: typing.List[str] = []
         self.__selected_id: str = ""
         self.__selected_session: redcat.session.Session = None
         self.__sessions_last_id: int = 0
@@ -42,7 +44,7 @@ class Manager:
     def start(self) -> None:
         if not self.__garbage_collector:
             self.__stop_evt.clear()
-            self.__garbage_collector = threading.Thread(target=self.__clean_broken_sessions)
+            self.__garbage_collector = threading.Thread(target=self.__clean_broken_sessions_and_listeners)
             self.__garbage_collector.start()
 
     def stop(self) -> None:
@@ -65,13 +67,18 @@ class Manager:
         with self.__lock_sessions:
             self.__sessions.clear()
 
-    def __clean_broken_sessions(self) -> None:
+    def __clean_broken_sessions_and_listeners(self) -> None:
         while not self.__stop_evt.is_set():
             with self.__lock_broken_sessions:
                 if len(self.__broken_sessions) > 0:
                     for id in self.__broken_sessions:
                         self.kill(None, "session", id)
                 self.__broken_sessions.clear()
+            with self.__lock_broken_listeners:
+                if len(self.__broken_listeners) > 0:
+                    for id in self.__broken_listeners:
+                        self.kill(None, "listener", id)
+                self.__broken_listeners.clear()
             time.sleep(0.05)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
@@ -81,23 +88,25 @@ class Manager:
         while sender.running:
             if sess.wait_open(0.1):
                 with self.__lock_sessions:
+                    sess.interactive(True, id) # getting pty immediately
+                    sess.interactive(False)
+                    # we're not on the main thread. 
+                    # We must first wait for the session to terminate the shell setup 
+                    # before allowing any user interaction from the main thread
                     id = str(self.__sessions_last_id)
                     self.__sessions[id] = sess
                     self.__sessions_last_id += 1
                     if not self.__selected_session:
                         self.__selected_session = sess
                         self.__selected_id = id
-                    sess.interactive(True, id) # getting pty immediately
-                    sess.interactive(False)
                     break
         if not sender.running:
-            if id == -1:
-                with self.__lock_sessions:
-                    sess.stop()
-                    sess.close()
-                    sess = None
+            if not id:
+                sess.stop()
+                sess.close()
+                sess = None
 
-    def listen(self, background: bool=True, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
+    def listen(self, background: bool=True, **kwargs) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
         if not background:
@@ -106,7 +115,7 @@ class Manager:
             sess = None
             new_listener = None
             try:
-                new_listener = redcat.listener.factory.get_listener(**kwargs)
+                new_listener = redcat.listener.factory.get_listener(error_callback=self.on_error, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -142,7 +151,7 @@ class Manager:
         else:
             new_listener = None
             try:
-                new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, **kwargs)
+                new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, error_callback=self.on_error, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -153,7 +162,7 @@ class Manager:
                 res, error = new_listener.start()
         return res, error
 
-    def connect(self, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
+    def connect(self, **kwargs) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
         sess = None
@@ -343,16 +352,28 @@ class Manager:
         return res, error
 
     def on_error(self, obj: typing.Any, error: str) -> None:
-        print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
+        if not threading.current_thread() is threading.main_thread():
+            # on main thread, the error will be displayed after the command terminate
+            print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
+        found = False
         with self.__lock_sessions:
             for id, sess in self.__sessions.items():
                 if sess == obj:
+                    found = True
                     if self.__selected_id == id:
                         self.__selected_id = ""
                         self.__selected_session = None
                     with self.__lock_broken_sessions:
                         self.__broken_sessions.append(id)
                     break
+        if not found:
+            with self.__lock_listeners:
+                for id, listen_point in self.__listeners.items():
+                    if listen_point == obj:
+                        found = True
+                        with self.__lock_broken_sessions:
+                            self.__broken_listeners.append(id)
+                        break
 
 
 

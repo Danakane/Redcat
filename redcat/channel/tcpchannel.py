@@ -12,8 +12,8 @@ import redcat.channel
 
 class TcpChannel(redcat.channel.Channel):
 
-    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None) -> None:
-        super().__init__()
+    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._remote: typing.Tuple[typing.Any, ...] = None
         self._sock: socket.socket = None
         self._addr: str = None
@@ -75,9 +75,6 @@ class TcpChannel(redcat.channel.Channel):
         if self.is_open:
             print(f"Connected to remote {self._remote[0]}:{self._remote[1]}", end="")
             sys.stdout.flush()
-
-    def on_error(self, error: str) -> None:
-        pass
 
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         res = False

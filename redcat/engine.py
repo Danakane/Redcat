@@ -259,7 +259,7 @@ class Engine:
             error = ""
         return res, error
 
-    def __connect(self, sender: argparse.ArgumentParser, protocol: str, platform: str, **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
+    def __connect(self, sender: argparse.ArgumentParser, protocol: str, platform: str, **kwargs) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         protocol_code = redcat.channel.ChannelProtocol.TCP
@@ -270,8 +270,7 @@ class Engine:
         res, error = self.__manager.connect(protocol=protocol_code, platform_name=platform, **kwargs)
         return res, error
 
-    def __listen(self, sender: argparse.ArgumentParser, background: bool, protocol: str, platform: str,
-        **kwargs: typing.Dict[str, typing.Any]) -> typing.Tuple[bool, str]:
+    def __listen(self, sender: argparse.ArgumentParser, background: bool, protocol: str, platform: str, **kwargs) -> typing.Tuple[bool, str]:
         res = True
         error = ""
         protocol_code = redcat.channel.ChannelProtocol.TCP

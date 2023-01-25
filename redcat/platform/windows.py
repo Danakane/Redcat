@@ -9,18 +9,19 @@ import shlex
 import redcat.style
 import redcat.channel
 import redcat.transaction
-from redcat.platform import Platform, WINDOWS
+import redcat.platform
 
 
-class Windows(Platform):
+class Windows(redcat.platform.Platform):
 
     def __init__(self, chan: redcat.channel.Channel) -> None:
-        super().__init__(chan, WINDOWS)
+        super().__init__(chan, redcat.platform.WINDOWS)
         self.__interactive: bool = False
 
     def is_interactive(self) -> bool:
         return self.__interactive
 
+    @redcat.platform.Platform._with_lock
     def interactive(self, value: bool, session_id: str = None) -> bool:
         self.__interactive = value
         self.channel.purge()

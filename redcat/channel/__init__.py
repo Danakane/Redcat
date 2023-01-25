@@ -73,6 +73,11 @@ class Channel(abc.ABC):
     def remote(self) -> str:
         pass
 
+    @property
+    @abstractmethod
+    def protocol(self) -> typing.Tuple[int, str]:
+        pass
+
     @abstractmethod
     def send(self, data: bytes) -> typing.Tuple[bool, str]:
         pass

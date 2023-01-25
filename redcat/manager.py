@@ -72,7 +72,7 @@ class Manager:
                     for id in self.__broken_sessions:
                         self.kill(None, "session", id)
                 self.__broken_sessions.clear()
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
         sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
@@ -343,16 +343,16 @@ class Manager:
         return res, error
 
     def on_error(self, obj: typing.Any, error: str) -> None:
-        obj_id = -1
         print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
         with self.__lock_sessions:
             for id, sess in self.__sessions.items():
                 if sess == obj:
-                    obj_id = id
+                    if self.__selected_id == id:
+                        self.__selected_id = ""
+                        self.__selected_session = None
+                    with self.__lock_broken_sessions:
+                        self.__broken_sessions.append(id)
                     break
-        if obj_id != -1:
-            with self.__lock_broken_sessions:
-                self.__broken_sessions.append(obj_id)
 
 
 

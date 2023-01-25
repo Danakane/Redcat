@@ -86,7 +86,7 @@ class Session:
             self.__thread_writer.join()
 
     def interactive(self, value: bool, session_id: str = None) -> bool:
-        if (self.__interactive != value) and self.__platform:
+        if (self.__interactive != value) and self.__platform and self.is_open:
             if not value:
                 self.__user = ""
             self.__platform.interactive(value, session_id)

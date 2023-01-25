@@ -49,8 +49,12 @@ class Platform(abc.ABC):
     def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
         return b"echo %b; %b && echo %b; echo %b\n" % (start, payload, control, end)
 
-    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bool, bytes]:
-        return self.__chan.exec_transaction(buffer, start, end, handle_echo)
+    def exec_transaction(self, buffer: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
+        res = False
+        data = b""
+        if self.__chan.is_open:
+            res, data = self.__chan.exec_transaction(buffer, start, end, handle_echo)
+        return res, data
 
     def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
         res, error = self.channel.send(f"{cmd}\n".encode())

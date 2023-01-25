@@ -17,7 +17,7 @@ socat OPENSSL:localhost:4444,cert=ca2.pem,cafile=cert.pem,verify=1 EXEC:/bin/bas
 
 connect localhost 4444 --protocol ssl
 
-socat openssl-listen:4444,reuseaddr,cert=test/certs/ca.pem,verify=0 exec:'bash -li'
+socat openssl-listen:4444,reuseaddr,cert=test/certs/ca2.pem,verify=0 exec:'bash -li'
 
 
 # test connect with server and client authentication

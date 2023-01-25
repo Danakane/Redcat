@@ -34,9 +34,9 @@ class Engine:
         cmd_connect = redcat.command.Command("connect", self.__connect, "connect to a remote bind shell", self.__on_connect_completion)
         cmd_connect.add_argument("addr", type=str, nargs=1, help="address to connect")
         cmd_connect.add_argument("port", type=int, nargs=1, help="port to connect to")
-        cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], 
-            default=redcat.platform.LINUX, help="expected platform (linux or windows)")
-        cmd_connect.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol (tcp or ssl)")
+        cmd_connect.add_argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
+            default=redcat.platform.LINUX, help="expected platform")
+        cmd_connect.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol")
         cmd_connect.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl client")
         cmd_connect.add_argument("--key", type=str, nargs=1, help="path of private key of the client certificate")
         cmd_connect.add_argument("--password", type=str, nargs=1, help="password of the private key")
@@ -46,10 +46,10 @@ class Engine:
         cmd_listen = redcat.command.Command("listen", self.__listen, "listen for a reverse shell", self.__on_listen_completion)
         cmd_listen.add_argument("addr", type=str, nargs="?", default="", help="address to bind")
         cmd_listen.add_argument("port", type=int, nargs=1, help="port to bind on")
-        cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=["linux", "windows"], 
-            default=redcat.platform.LINUX, help="expected platform (linux or windows)")
+        cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
+            default=redcat.platform.LINUX, help="expected platform")
         cmd_listen.add_argument("-b", "--background", action="store_true", default=False, help="execute the listener in the background to handle multiple connections")
-        cmd_listen.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol (tcp or ssl)")
+        cmd_listen.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol")
         cmd_listen.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl shell listener")
         cmd_listen.add_argument("--key", type=str, nargs=1, help="path of private key of the listener certificate")
         cmd_listen.add_argument("--password", type=str, nargs=1, help="password of the private key")
@@ -266,7 +266,7 @@ class Engine:
         if protocol == "ssl":
             protocol_code = redcat.channel.ChannelProtocol.SSL
         elif "cert" in kwargs.keys() or "key" in kwargs.keys() or "password" in kwargs.keys() or "ca_cert" in kwargs.keys():
-            sender.error("listen command doesn't accept --cert, --key, --password and --ca-cert flags when not using --protocol ssl")  
+            sender.error("redcat doesn't accept --cert, --key, --password and --ca-cert flags when not using protocol ssl")  
         res, error = self.__manager.connect(protocol=protocol_code, platform_name=platform, **kwargs)
         return res, error
 
@@ -277,9 +277,9 @@ class Engine:
         if protocol == "ssl":
             protocol_code = redcat.channel.ChannelProtocol.SSL
             if not ("cert" in kwargs.keys() and "key" in kwargs.keys()) and sender:
-                sender.error("listen command requires --cert and --key flags when using --protocol ssl")
+                sender.error("redcat requires --cert and --key flags when using protocol ssl in bind mode")
         elif "cert" in kwargs.keys() or "key" in kwargs.keys() or "password" in kwargs.keys() or "ca_cert" in kwargs.keys():
-            sender.error("listen command doesn't accept --cert, --key, --password and --ca-cert flags when not using --protocol ssl") 
+            sender.error("redcat doesn't accept --cert, --key, --password and --ca-cert flags when not using protocol ssl") 
         res, error = self.__manager.listen(background=background, protocol=protocol_code, platform_name=platform, **kwargs)
         return res, error
 

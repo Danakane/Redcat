@@ -88,14 +88,14 @@ class Manager:
         while sender.running:
             if sess.wait_open(0.1):
                 with self.__lock_sessions:
+                    id = str(self.__sessions_last_id)
+                    self.__sessions_last_id += 1
                     sess.interactive(True, id) # getting pty immediately
                     sess.interactive(False)
                     # we're not on the main thread. 
                     # We must first wait for the session to terminate the shell setup 
                     # before allowing any user interaction from the main thread
-                    id = str(self.__sessions_last_id)
                     self.__sessions[id] = sess
-                    self.__sessions_last_id += 1
                     if not self.__selected_session:
                         self.__selected_session = sess
                         self.__selected_id = id

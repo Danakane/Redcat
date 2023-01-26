@@ -86,7 +86,7 @@ class Channel(abc.ABC):
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         pass
 
-    def on_error(self) -> None:
+    def on_error(self, error: str) -> None:
         pass
 
     @abstractmethod

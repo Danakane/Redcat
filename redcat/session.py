@@ -82,31 +82,37 @@ class Session:
         self.__interactive = self.__platform.interactive(False)
         if self.__thread_reader:
             self.__thread_reader.join()
+            self.__thread_reader = None
         if self.__thread_writer:
             self.__thread_writer.join()
+            self.__thread_writer = None
 
     def interactive(self, value: bool, session_id: str = None) -> bool:
+        res = False
         if (self.__interactive != value) and self.__platform and self.is_open:
             if not value:
                 self.__user = ""
-            self.__platform.interactive(value, session_id)
+            res = self.__platform.interactive(value, session_id)
             self.__interactive = self.__platform.is_interactive
-        return self.__interactive
+        return res
 
     def start(self) -> None:
-        self.__stop_evt.clear()
-        self.__thread_reader = threading.Thread(target=self.__run_reader)
-        self.__thread_writer = threading.Thread(target=self.__run_writer)
-        self.__thread_reader.start()
-        self.__thread_writer.start()
+        if self.__chan.is_open:
+            self.__stop_evt.clear()
+            self.__thread_reader = threading.Thread(target=self.__run_reader)
+            self.__thread_writer = threading.Thread(target=self.__run_writer)
+            self.__thread_reader.start()
+            self.__thread_writer.start()
 
     def stop(self) -> None:
         if not self.__stop_evt.is_set():
             self.__stop_evt.set()
         if self.__thread_reader:
             self.__thread_reader.join()
+            self.__thread_reader = None
         if self.__thread_writer:
             self.__thread_writer.join()
+            self.__thread_writer = None
         self.__running = False
 
     def send(self, data: bytes) -> typing.Tuple[bool, str]:

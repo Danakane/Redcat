@@ -117,9 +117,10 @@ class Channel(abc.ABC):
         self.__state = ChannelState.CLOSED
 
     def error(self, err: str) -> None:
-        self.__state = ChannelState.ERROR
-        self.on_error(err)
-        self.__error_callback(self, err)
+        if self.__state != ChannelState.ERROR:
+            self.__state = ChannelState.ERROR
+            self.on_error(err)
+            self.__error_callback(self, err)
 
     def collect(self, data: bytes) -> None:
         with self.__queue_lock:
@@ -146,42 +147,60 @@ class Channel(abc.ABC):
             while not self.__dataqueue.empty():
                 self.__dataqueue.queue.clear()
 
-    def exec_transaction(self, data: bytes, start: bytes, end: bytes, handle_echo: bool) -> typing.Tuple[bool, bytes]:
-        res = True
+    def exec_transaction(self, data: bytes, start: bytes, end: bytes, handle_echo: bool, timeout: int) -> typing.Tuple[bool, bytes]:
+        res = False
         rdata = b""
-        with self.__transaction_lock:
-            res, error = self.send(data)
-            rdata = b""
-            resp = b""
-            start_received = False
-            end_received = False
-            if handle_echo:
-                # purge the command echo
-                while res and (end not in rdata):
+        start_time = 0
+        end_time = 0
+        timed_out = False
+        if self.is_open:
+            with self.__transaction_lock:
+                res, error = self.send(data)
+                rdata = b""
+                resp = b""
+                start_received = False
+                end_received = False
+                if handle_echo:
+                    # purge the command echo
+                    start_time = time.time()
+                    while res and (end not in rdata) and (not timed_out):
+                        res, error, resp = self.recv()
+                        rdata += resp
+                        end_time = time.time()
+                        if end_time - start_time > timeout:
+                            timed_out = True
+                    resp = b""
+                    rdata = redcat.utils.extract_data(rdata, end)
+                start_time = time.time()
+                while res and (not start_received) and (not timed_out):
                     res, error, resp = self.recv()
                     rdata += resp
-                resp = b""
-                rdata = redcat.utils.extract_data(rdata, end)
-            while res and (not start_received):
-                res, error, resp = self.recv()
-                rdata += resp
-                if start in rdata:
-                    start_received = True
-            if end in rdata:
-                end_received = True
-            while res and (not end_received):
-                res, error, resp = self.recv()
-                rdata += resp
+                    end_time = time.time()
+                    if start in rdata:
+                        start_received = True
+                    elif end_time - start_time > timeout:
+                        timed_out = True
                 if end in rdata:
                     end_received = True
-            resp = b"placeholder"
-            while res and (len(resp) > 0): # clear remaining data in the channel
-                res, error, resp = self.recv()
+                while res and (not end_received) and (not timed_out):
+                    res, error, resp = self.recv()
+                    rdata += resp
+                    end_time = time.time()
+                    if end in rdata:
+                        end_received = True
+                    elif end_time - start_time > timeout:
+                        timed_out = True
+                if not timed_out:
+                    resp = b"placeholder"
+                    while res and (len(resp) > 0): # clear remaining data in the channel
+                        res, error, resp = self.recv()
         if not res:
             rdata = b""
+        elif timed_out:
+            self.error(redcat.style.bold("channel's transaction timeout"))
         else:
             rdata = redcat.utils.extract_data(rdata, start, end)
-        return res, rdata
+        return (res and not timed_out), rdata
 
     def wait_open(self, timeout=None) -> bool:
         return self.__ready_evt.wait(timeout)

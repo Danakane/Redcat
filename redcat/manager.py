@@ -14,16 +14,16 @@ import redcat.session
 class Manager:
 
     def __init__(self) -> None:
-        self.__lock_sessions: threading.Lock = threading.Lock()
+        self.__lock_sessions: threading.Lock = threading.RLock()
         self.__sessions: typing.Dict[str, redcat.session.Session] = {}
-        self.__lock_broken_sessions: threading.Lock = threading.Lock()
+        self.__lock_broken_sessions: threading.Lock = threading.RLock()
         self.__broken_sessions: typing.List[str] = []
-        self.__lock_broken_listeners: threading.Lock = threading.Lock()
+        self.__lock_broken_listeners: threading.Lock = threading.RLock()
         self.__broken_listeners: typing.List[str] = []
         self.__selected_id: str = ""
         self.__selected_session: redcat.session.Session = None
         self.__sessions_last_id: int = 0
-        self.__lock_listeners: threading.Lock = threading.Lock()
+        self.__lock_listeners: threading.Lock = threading.RLock()
         self.__listeners: typing.Dict[str, typing.Tuple(threading.Thread, threading.Event)] = {}
         self.__listeners_last_id: int = 0
         self.__garbage_collector: threading.Thread = None
@@ -90,16 +90,18 @@ class Manager:
                 with self.__lock_sessions:
                     id = str(self.__sessions_last_id)
                     self.__sessions_last_id += 1
-                    sess.interactive(True, id) # getting pty immediately
-                    sess.interactive(False)
+                    res1 = sess.interactive(True, id) # getting pty immediately
+                    res2 = sess.interactive(False)
+                    res = res1 and res2
                     # we're not on the main thread. 
                     # We must first wait for the session to terminate the shell setup 
                     # before allowing any user interaction from the main thread
-                    self.__sessions[id] = sess
-                    if not self.__selected_session:
-                        self.__selected_session = sess
-                        self.__selected_id = id
-                    break
+                    if res:
+                        self.__sessions[id] = sess
+                        if not self.__selected_session:
+                            self.__selected_session = sess
+                            self.__selected_id = id
+                break
         if not sender.running:
             if not id:
                 sess.stop()
@@ -128,26 +130,28 @@ class Manager:
                         if sess.wait_open():
                             with self.__lock_sessions:
                                 id = str(self.__sessions_last_id)
-                                self.__sessions[id] = sess
                                 self.__sessions_last_id += 1
-                                if not self.__selected_session:
-                                    self.__selected_session = sess
-                                    self.__selected_id = id
                 except KeyboardInterrupt:
-                    if sess:
-                        sess.stop()
-                        sess.close()
-                        sess = None
-                        if id != -1 and id in self.__sessions.keys():
-                            del self.__sessions[id]
+                    res = False
+                    sess = None
+                    error = redcat.style.bold("interrupted by user")
             if sess:
-                sess.interactive(True, id) 
-                sess.start()
-                sess.wait_stop()
-                sess.interactive(False)
-                print()
-                res = True
-                error = ""
+                res1 = sess.interactive(True, id)
+                if res1: 
+                    sess.start()
+                    sess.wait_stop()
+                res2 = sess.interactive(False)
+                res = res1 and res2
+                if res:
+                    with self.__lock_sessions:
+                        self.__sessions[id] = sess
+                        if not self.__selected_session:
+                            self.__selected_session = sess
+                            self.__selected_id = id
+                        error = ""
+                else:
+                    error = redcat.style.bold(f"session {id} is broken")
+                print()      
         else:
             new_listener = None
             try:
@@ -179,28 +183,30 @@ class Manager:
                     if sess.wait_open():
                         with self.__lock_sessions:
                             id = str(self.__sessions_last_id)
-                            self.__sessions[id] = sess
                             self.__sessions_last_id += 1
+                except KeyboardInterrupt:
+                    res = False
+                    sess = None
+                    error = redcat.style.bold("interrupted by user")
+                if sess:
+                    res1 = sess.interactive(True, id)
+                    if res1: 
+                        sess.start()
+                        sess.wait_stop()
+                    res2 = sess.interactive(False)
+                    res = res1 and res2
+                    if res:
+                        with self.__lock_sessions:
+                            self.__sessions[id] = sess
                             if not self.__selected_session:
                                 self.__selected_session = sess
                                 self.__selected_id = id
-                except KeyboardInterrupt:
-                    res = False
+                        error = ""
+                    else:
+                        error = redcat.style.bold(f"session {id} is broken")
+                else:
                     error = redcat.style.bold("failed to create session")
-                    if sess:
-                        sess.stop()
-                        sess.close()
-                        sess = None
-                        if id != -1 and id in self.__sessions.keys():
-                            del self.__sessions[id]
-                if sess:
-                    sess.interactive(True, id) 
-                    sess.start()
-                    sess.wait_stop()
-                    sess.interactive(False)
-                    print()
-                    res = True
-                    error = ""
+                print()
         return res, error
 
     # kill a session or a listener

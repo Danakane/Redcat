@@ -164,14 +164,15 @@ class Linux(redcat.platform.Platform):
         return got_pty
 
     @redcat.platform.Platform._with_lock
-    def interactive(self, value: bool, session_id: str = None) -> bool:
+    def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
         res = False
         if value != self.__interactive:
             if value:
                 # save the terminal settings going in raw mode
                 if not self.__interactive:
                     self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
-                    tty.setraw(sys.stdin.fileno())
+                    if raw:
+                        tty.setraw(sys.stdin.fileno())
                 self.disable_history(handle_echo=False)
                 term = os.environ.get("TERM", "xterm")
                 columns, rows = os.get_terminal_size(0) 

@@ -22,11 +22,11 @@ class Windows(redcat.platform.Platform):
         return self.__interactive
 
     @redcat.platform.Platform._with_lock
-    def interactive(self, value: bool, session_id: str = None) -> bool:
+    def interactive(self, value: bool, session_id: str = None, raw:bool =True) -> bool:
         self.__interactive = value
         self.channel.purge()
-        self.send_cmd("")
-        return True
+        res, _ = self.send_cmd("")
+        return res
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
         return b"echo %b & (%b && echo %b) & echo %b\n" % (start, payload, control, end)

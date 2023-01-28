@@ -90,7 +90,7 @@ class Manager:
                 with self.__lock_sessions:
                     id = str(self.__sessions_last_id)
                     self.__sessions_last_id += 1
-                    res1 = sess.interactive(True, id) # getting pty immediately
+                    res1 = sess.interactive(True, id, False) # getting pty immediately, but no raw mode in worker thread to not break the console
                     res2 = sess.interactive(False)
                     res = res1 and res2
                     # we're not on the main thread. 

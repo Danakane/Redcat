@@ -33,7 +33,7 @@ class Platform(abc.ABC):
         pass
 
     @abstractmethod
-    def interactive(self, value: bool, session_id: str = None) -> bool:
+    def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
         pass
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:

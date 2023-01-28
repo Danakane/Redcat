@@ -87,12 +87,12 @@ class Session:
             self.__thread_writer.join()
             self.__thread_writer = None
 
-    def interactive(self, value: bool, session_id: str = None) -> bool:
+    def interactive(self, value: bool, session_id: str = None, raw: bool=True) -> bool:
         res = False
         if (self.__interactive != value) and self.__platform and self.is_open:
             if not value:
                 self.__user = ""
-            res = self.__platform.interactive(value, session_id)
+            res = self.__platform.interactive(value, session_id, raw)
             self.__interactive = self.__platform.is_interactive
         return res
 

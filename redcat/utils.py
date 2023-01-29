@@ -1,5 +1,5 @@
+import typing
 import socket
-import ipaddress
 
 import redcat.style
 
@@ -18,14 +18,13 @@ def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) 
             extracted = raw[start_index+len(start):]
     return extracted
 
-def valid_ip_address(addr: str) -> int:
-    res: int = socket.AF_INET
-    try:
-        if type(ipaddress.ip_address(addr)) is ipaddress.IPv6Address:
-            res = socket.AF_INET6
-    except ValueError:
-        pass
-    return res
+def get_remote_and_family_from_addr(addr: str, port: int, socktype: int = 0) -> typing.Tuple[int, typing.Tuple]:
+    if not addr:
+        addr = "0.0.0.0" # "" -> "0.0.0.0" we default to IPv4
+    addrinfo = socket.getaddrinfo(addr, port, 0, socktype)
+    family = addrinfo[0][0]
+    remote = addrinfo[0][4]
+    return family, remote
 
 def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))

@@ -29,7 +29,7 @@ class TcpChannel(redcat.channel.Channel):
     def remote(self) -> str:
         res = ""
         if self._remote:
-            res = f"@{self._remote[0]}:{self._remote[1]}"
+            res = f"{self._remote[0]}:{self._remote[1]}"
         return res
 
     @property
@@ -41,11 +41,7 @@ class TcpChannel(redcat.channel.Channel):
         error = "Failed to create session"
         if not self._sock:
             try:
-                protocol = socket.AF_INET
-                endpoint = (self._addr, self._port)
-                if redcat.utils.valid_ip_address(self._addr) == socket.AF_INET6:
-                    endpoint = (self._addr, self._port, 0, 0)
-                    protocol = socket.AF_INET6
+                protocol, endpoint = redcat.utils.get_remote_and_family_from_addr(self._addr, self._port, socket.SOCK_STREAM)
                 self._sock = socket.socket(protocol, socket.SOCK_STREAM)
                 self._sock.connect(endpoint)
                 self._remote = endpoint

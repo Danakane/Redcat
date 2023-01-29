@@ -12,19 +12,16 @@ class TcpListener(redcat.listener.Listener):
 
     def __init__(self, addr: str, port: int, **kwargs) -> None:
         super().__init__(**kwargs)
+        self.__addr: str = addr
+        self.__port: int = port
         self._endpoint: typing.Tuple[typing.Any] = None
-        self._protocol: int = socket.AF_INET
-        if redcat.utils.valid_ip_address(addr) == socket.AF_INET:
-            self._endpoint = (addr, port)
-            self._protocol = socket.AF_INET
-        else:
-            self._endpoint = (addr, port, 0, 0)
-            self._protocol = socket.AF_INET6
+        self._protocol: int = 0
         self._sock = None
+        
 
     @property
     def endpoint(self) -> str:
-         return f"@{self._endpoint[0]}:{self._endpoint[1]}"
+         return f"{self._endpoint[0]}:{self._endpoint[1]}"
 
     @property
     def protocol(self) -> typing.Tuple[int, str]:
@@ -34,6 +31,7 @@ class TcpListener(redcat.listener.Listener):
         res = False
         error = "Failed to start the listener"
         try:
+            self._protocol, self._endpoint = redcat.utils.get_remote_and_family_from_addr(self.__addr, self.__port, socktype=socket.SOCK_STREAM)
             self._sock = socket.socket(self._protocol, socket.SOCK_STREAM)
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self._sock.bind(self._endpoint)
@@ -42,7 +40,7 @@ class TcpListener(redcat.listener.Listener):
             error = ""
         except socket.error as err:
             res = False
-            error = redcat.style.bold(": ".join([str(arg) for arg in err.args]))
+            error = redcat.utils.get_error(err)
         return res, error
 
     def on_stop(self) -> None:

@@ -7,12 +7,17 @@ import redcat.channel
 
 class Listener:
 
-    def __init__(self, platform_name: str, callback: typing.Callable = None, error_callback: typing.Callable = None) -> None:
+    def __init__(self, id: str, platform_name: str, callback: typing.Callable = None, error_callback: typing.Callable = None) -> None:
+        self.__id: str = id
         self.__callback: typing.Callable = callback
         self.__error_callback: typing.Callable = error_callback
         self.__platform_name: str = platform_name
         self.__thread: threading.Thread = None
         self.__stop_evt: threading.Event = threading.Event()
+
+    @property
+    def id(self) -> None:
+        return self.__id
 
     @property
     @abstractmethod

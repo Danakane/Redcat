@@ -72,52 +72,59 @@ class Manager:
             with self.__lock_broken_sessions:
                 if len(self.__broken_sessions) > 0:
                     for id in self.__broken_sessions:
-                        self.kill(None, "session", id)
-                self.__broken_sessions.clear()
+                        with self.__lock_sessions:
+                            if id in self.__sessions.keys():
+                                self.kill(None, "session", id)
+                    self.__broken_sessions.clear()
             with self.__lock_broken_listeners:
                 if len(self.__broken_listeners) > 0:
                     for id in self.__broken_listeners:
-                        self.kill(None, "listener", id)
-                self.__broken_listeners.clear()
+                        with self.__lock_listeners:
+                            if id in self.__listeners.keys():
+                                self.kill(None, "listener", id)
+                    self.__broken_listeners.clear()
             time.sleep(0.05)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
-        sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
-        sess.open()
+        res = False
         id = None
+        with self.__lock_sessions:
+            id = str(self.__sessions_last_id)
+            self.__sessions_last_id += 1
+        sess = redcat.session.Session(id=id, error_callback=self.on_error, chan=chan, platform_name=platform_name)
+        sess.open()
         while sender.running:
             if sess.wait_open(0.1):
-                with self.__lock_sessions:
-                    id = str(self.__sessions_last_id)
-                    self.__sessions_last_id += 1
-                    res1 = sess.interactive(True, id, False) # getting pty immediately, but no raw mode in worker thread to not break the console
-                    res2 = sess.interactive(False)
-                    res = res1 and res2
-                    # we're not on the main thread. 
-                    # We must first wait for the session to terminate the shell setup 
-                    # before allowing any user interaction from the main thread
-                    if res:
-                        self.__sessions[id] = sess
+                res1 = sess.interactive(True, False) # getting pty immediately, but no raw mode in worker thread to not break the console
+                res2 = sess.interactive(False)
+                res = res1 and res2
+                # we're not on the main thread. 
+                # We must first wait for the session to terminate the shell setup 
+                # before allowing any user interaction from the main thread
+                if res:
+                    with self.__lock_sessions:
+                        self.__sessions[sess.id] = sess
                         if not self.__selected_session:
                             self.__selected_session = sess
-                            self.__selected_id = id
-                break
-        if not sender.running:
-            if not id:
-                sess.stop()
-                sess.close()
-                sess = None
+                            self.__selected_id = sess.id
+                        res = True
+                    break
+        if not res:
+            sess.close()
 
     def listen(self, background: bool=True, **kwargs) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("failed to create session")
         if not background:
-            id = None
             chan = None
             sess = None
             new_listener = None
             try:
-                new_listener = redcat.listener.factory.get_listener(error_callback=self.on_error, **kwargs)
+                listener_id = None
+                with self.__lock_listeners:
+                    listener_id = str(self.__listeners_last_id)
+                    self.__listeners_last_id += 1
+                new_listener = redcat.listener.factory.get_listener(id=listener_id, error_callback=self.on_error, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -125,18 +132,19 @@ class Manager:
                 try:
                     res, error, chan, platform_name = new_listener.listen_once()
                     if res and chan:
-                        sess = redcat.session.Session(error_callback=self.on_error, chan=chan, platform_name=platform_name)
+                        id = None
+                        with self.__lock_sessions:
+                            id = str(self.__sessions_last_id)
+                            self.__sessions_last_id += 1
+                        sess = redcat.session.Session(id=id, error_callback=self.on_error, chan=chan, platform_name=platform_name)
                         sess.open()
-                        if sess.wait_open():
-                            with self.__lock_sessions:
-                                id = str(self.__sessions_last_id)
-                                self.__sessions_last_id += 1
+                        sess.wait_open()
                 except KeyboardInterrupt:
                     res = False
                     sess = None
                     error = redcat.style.bold("interrupted by user")
             if sess:
-                res1 = sess.interactive(True, id)
+                res1 = sess.interactive(True)
                 if res1: 
                     sess.start()
                     sess.wait_stop()
@@ -144,25 +152,28 @@ class Manager:
                 res = res1 and res2
                 if res:
                     with self.__lock_sessions:
-                        self.__sessions[id] = sess
+                        self.__sessions[sess.id] = sess
                         if not self.__selected_session:
                             self.__selected_session = sess
-                            self.__selected_id = id
+                            self.__selected_id = sess.id
                         error = ""
                 else:
-                    error = redcat.style.bold(f"session {id} is broken")
+                    error = redcat.style.bold(f"session {sess.id} is broken")
                 print()      
         else:
             new_listener = None
             try:
-                new_listener = redcat.listener.factory.get_listener(callback=self.__on_new_channel, error_callback=self.on_error, **kwargs)
+                listener_id = None
+                with self.__lock_listeners:
+                    listener_id = str(self.__listeners_last_id)
+                    self.__listeners_last_id += 1
+                new_listener = redcat.listener.factory.get_listener(id=listener_id, callback=self.__on_new_channel, error_callback=self.on_error, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
             if new_listener:
                 with self.__lock_listeners:
-                    self.__listeners[str(self.__listeners_last_id)] = new_listener
-                    self.__listeners_last_id += 1
+                    self.__listeners[new_listener.id] = new_listener
                 res, error = new_listener.start()
         return res, error
 
@@ -171,25 +182,25 @@ class Manager:
         error = redcat.style.bold("failed to create session")
         sess = None
         try:
-            sess = redcat.session.Session(error_callback=self.on_error, **kwargs)
+            id = None
+            with self.__lock_sessions:
+                id = str(self.__sessions_last_id)
+                self.__sessions_last_id += 1
+            sess = redcat.session.Session(id=id, error_callback=self.on_error, **kwargs)
         except Exception as err:
             error = redcat.utils.get_error(err)
             sess = None
         if sess:
             res, error = sess.open()
-            id = None
             if res:
                 try:
-                    if sess.wait_open():
-                        with self.__lock_sessions:
-                            id = str(self.__sessions_last_id)
-                            self.__sessions_last_id += 1
+                    sess.wait_open()
                 except KeyboardInterrupt:
                     res = False
                     sess = None
                     error = redcat.style.bold("interrupted by user")
                 if sess:
-                    res1 = sess.interactive(True, id)
+                    res1 = sess.interactive(True)
                     if res1: 
                         sess.start()
                         sess.wait_stop()
@@ -197,13 +208,13 @@ class Manager:
                     res = res1 and res2
                     if res:
                         with self.__lock_sessions:
-                            self.__sessions[id] = sess
+                            self.__sessions[sess.id] = sess
                             if not self.__selected_session:
                                 self.__selected_session = sess
-                                self.__selected_id = id
+                                self.__selected_id = sess.id
                         error = ""
                     else:
-                        error = redcat.style.bold(f"session {id} is broken")
+                        error = redcat.style.bold(f"session {sess.id} is broken")
                 else:
                     error = redcat.style.bold("failed to create session")
                 print()
@@ -357,29 +368,19 @@ class Manager:
                 error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
 
-    def on_error(self, obj: typing.Any, error: str) -> None:
+    def on_error(self, sender: typing.Any, error: str) -> None:
         if not threading.current_thread() is threading.main_thread():
             # on main thread, the error will be displayed after the command terminate
             print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
-        found = False
-        with self.__lock_sessions:
-            for id, sess in self.__sessions.items():
-                if sess == obj:
-                    found = True
-                    if self.__selected_id == id:
-                        self.__selected_id = ""
-                        self.__selected_session = None
-                    with self.__lock_broken_sessions:
-                        self.__broken_sessions.append(id)
-                    break
-        if not found:
-            with self.__lock_listeners:
-                for id, listen_point in self.__listeners.items():
-                    if listen_point == obj:
-                        found = True
-                        with self.__lock_broken_sessions:
-                            self.__broken_listeners.append(id)
-                        break
+        if isinstance(sender, redcat.session.Session):
+            if self.__selected_id == id:
+                self.__selected_id = ""
+                self.__selected_session = None
+            with self.__lock_broken_sessions:
+                self.__broken_sessions.append(sender.id)
+        elif isinstance(sender, redcat.listener.Listener):
+            with self.__lock_broken_sessions:
+                self.__broken_listeners.append(sender.id)
 
 
 

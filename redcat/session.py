@@ -9,7 +9,8 @@ import redcat.transaction
 
 class Session: 
 
-    def __init__(self, error_callback: typing.Callable, platform_name: str, chan: redcat.channel.Channel=None, **kwargs) -> None:
+    def __init__(self, id: str, error_callback: typing.Callable, platform_name: str, chan: redcat.channel.Channel=None, **kwargs) -> None:
+        self.__id: str = id
         self.__error_callback: typing.Callable = error_callback
         self.__chan: redcat.channel.Channel = None
         self.__platform: redcat.platform.Platform = None
@@ -26,7 +27,11 @@ class Session:
         self.__thread_reader: threading.Thread = None
         self.__thread_writer: threading.Thread = None
         self.__stop_evt: threading.Event = threading.Event()
-        self.__running: bool = False 
+        self.__running: bool = False
+
+    @property
+    def id(self) -> str:
+        return self.__id 
 
     @property
     def hostname(self) -> str:
@@ -77,22 +82,17 @@ class Session:
         return self.__chan.open()
 
     def close(self) -> None:
+        self.__interactive = self.__platform.interactive(False)
+        self.stop()
         self.__chan.close()
         print(end="") # to avoid bad file descriptor error message
-        self.__interactive = self.__platform.interactive(False)
-        if self.__thread_reader:
-            self.__thread_reader.join()
-            self.__thread_reader = None
-        if self.__thread_writer:
-            self.__thread_writer.join()
-            self.__thread_writer = None
 
-    def interactive(self, value: bool, session_id: str = None, raw: bool=True) -> bool:
+    def interactive(self, value: bool, raw: bool=True) -> bool:
         res = False
         if (self.__interactive != value) and self.__platform and self.is_open:
             if not value:
                 self.__user = ""
-            res = self.__platform.interactive(value, session_id, raw)
+            res = self.__platform.interactive(value, self.__id, raw)
             self.__interactive = self.__platform.is_interactive
         return res
 

@@ -24,7 +24,7 @@ class Manager:
         self.__selected_session: redcat.session.Session = None
         self.__sessions_last_id: int = 0
         self.__lock_listeners: threading.Lock = threading.RLock()
-        self.__listeners: typing.Dict[str, typing.Tuple(threading.Thread, threading.Event)] = {}
+        self.__listeners: typing.Dict[str, redcat.listener.Listener] = {}
         self.__listeners_last_id: int = 0
         self.__garbage_collector: threading.Thread = None
         self.__stop_evt: threading.Event = threading.Event()

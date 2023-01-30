@@ -18,13 +18,14 @@ def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) 
             extracted = raw[start_index+len(start):]
     return extracted
 
-def get_remote_and_family_from_addr(addr: str, port: int, socktype: int = 0) -> typing.Tuple[int, typing.Tuple]:
-    if not addr:
-        addr = "0.0.0.0" # "" -> "0.0.0.0" we default to IPv4
-    addrinfo = socket.getaddrinfo(addr, port, 0, socktype)
-    family = addrinfo[0][0]
-    remote = addrinfo[0][4]
-    return family, remote
+def get_remotes_and_families_from_hostname(hostname: str, port: int, socktype: int = 0) -> typing.Tuple[typing.Tuple[int], typing.Tuple[typing.Any, ...]]:
+    addrinfo = None
+    if not hostname:
+        hostname = "0.0.0.0"
+    addrinfo = socket.getaddrinfo(hostname, port, 0, socktype)
+    families = tuple([addrinfo[i][0] for i in range(len(addrinfo))])
+    remotes = tuple([addrinfo[i][4] for i in range(len(addrinfo))])
+    return families, remotes
 
 def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))

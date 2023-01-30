@@ -10,18 +10,23 @@ import redcat.listener
 
 class TcpListener(redcat.listener.Listener):
 
-    def __init__(self, addr: str, port: int, **kwargs) -> None:
+    def __init__(self, host: str, port: int, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.__addr: str = addr
+        self.__host: str = host
         self.__port: int = port
-        self._endpoint: typing.Tuple[typing.Any] = None
-        self._protocol: int = 0
-        self._sock = None
+        self._endpoints: typing.Tuple[typing.Tuple[typing.Any, ...], ...] = None
+        self._families: int = 0
+        self._socks: typing.List[socket.socket] = []
         
 
     @property
     def endpoint(self) -> str:
-         return f"{self._endpoint[0]}:{self._endpoint[1]}"
+        res = ""
+        if len(self._endpoints) == 1:
+            res = f"{self._endpoints[0][0]}:{self._endpoints[0][1]}"
+        else:
+            res = f"{self.__host}:{self.__port}"
+        return res
 
     @property
     def protocol(self) -> typing.Tuple[int, str]:
@@ -31,11 +36,13 @@ class TcpListener(redcat.listener.Listener):
         res = False
         error = "Failed to start the listener"
         try:
-            self._protocol, self._endpoint = redcat.utils.get_remote_and_family_from_addr(self.__addr, self.__port, socktype=socket.SOCK_STREAM)
-            self._sock = socket.socket(self._protocol, socket.SOCK_STREAM)
-            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self._sock.bind(self._endpoint)
-            self._sock.listen(5)
+            self._families, self._endpoints = redcat.utils.get_remotes_and_families_from_hostname(self.__host, self.__port, socktype=socket.SOCK_STREAM)
+            for family, endpoint in zip(self._families, self._endpoints):
+                sock = socket.socket(family, socket.SOCK_STREAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.bind(endpoint)
+                sock.listen(5)
+                self._socks.append(sock)
             res = True
             error = ""
         except socket.error as err:
@@ -44,22 +51,23 @@ class TcpListener(redcat.listener.Listener):
         return res, error
 
     def on_stop(self) -> None:
-        if self._sock:
-            try:
-                self._sock.shutdown(socket.SHUT_RDWR)
-                self._sock.close()
-            except:
-                pass
-            finally:
-                self._sock = None
+        if self._socks:
+            for sock in self._socks:
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                    sock.close()
+                except:
+                    pass
+            self._socks = None
 
     def listen(self) -> redcat.channel.Channel:
         chan = None
-        readables, _, _ = select.select([self._sock], [], [], 0.1)
+        readables, _, _ = select.select(self._socks, [], [], 0.1)
         if readables:
-            try:
-                sock, remote = self._sock.accept()
-                chan = self.build_channel(protocol=redcat.channel.ChannelProtocol.TCP, remote=remote, sock=sock)
-            except:
-                chan = None # TODO: Think about a way to report this error
+            for readable in readables:
+                try:
+                    sock, remote = readable.accept()
+                    chan = self.build_channel(protocol=redcat.channel.ChannelProtocol.TCP, remote=remote, sock=sock)
+                except:
+                    chan = None # TODO: Think about a way to report this error
         return chan

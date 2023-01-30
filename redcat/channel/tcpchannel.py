@@ -12,17 +12,17 @@ import redcat.channel
 
 class TcpChannel(redcat.channel.Channel):
 
-    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, addr: str = None, port: int = None, **kwargs) -> None:
+    def __init__(self, remote: typing.Tuple[typing.Any, ...] = None, sock: socket.socket = None, host: str = None, port: int = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._remote: typing.Tuple[typing.Any, ...] = None
         self._sock: socket.socket = None
-        self._addr: str = None
+        self._host: str = None
         self._port: int = None
         if remote and sock:
             self._remote = remote
             self._sock = sock
         else:
-            self._addr = addr
+            self._host = host
             self._port = port
 
     @property
@@ -41,12 +41,16 @@ class TcpChannel(redcat.channel.Channel):
         error = "Failed to create session"
         if not self._sock:
             try:
-                protocol, endpoint = redcat.utils.get_remote_and_family_from_addr(self._addr, self._port, socket.SOCK_STREAM)
-                self._sock = socket.socket(protocol, socket.SOCK_STREAM)
-                self._sock.connect(endpoint)
-                self._remote = endpoint
-                res = True
-                error = ""
+                protocols, endpoints = redcat.utils.get_remotes_and_families_from_hostname(self._host, self._port, socket.SOCK_STREAM)
+                for protocol, endpoint in zip(protocols, endpoints):
+                    try:
+                        self._sock = socket.socket(protocol, socket.SOCK_STREAM)
+                        self._sock.connect(endpoint)
+                        self._remote = endpoint
+                        res = True
+                        error = ""
+                    except socket.error:
+                        pass
             except Exception as err:
                 error = redcat.utils.get_error(err)
         else:
@@ -85,7 +89,7 @@ class TcpChannel(redcat.channel.Channel):
                         data = self._sock.recv(4096)
                         if len(data) == 0:
                             res = False
-                            error = redcat.style.bold(f"Connection with remote @{self._remote[0]}:{self._remote[1]} broken")
+                            error = redcat.style.bold(f"Connection with remote {self._remote[0]}:{self._remote[1]} broken")
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:

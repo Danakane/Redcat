@@ -13,7 +13,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--bind", action="store_true", default=False, help="use bind mode")
     parser.add_argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
         default=redcat.platform.LINUX, help="expected platform")
-    parser.add_argument("-a", "--addr", type=str, nargs=1, default="", help="address to bind or to connect")
+    parser.add_argument("-a", "--host", type=str, nargs=1, default="", help="host to bind or to connect")
     parser.add_argument("-p", "--port", type=int, nargs=1, help="port to bind or to connect")
     parser.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol")
     parser.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl shell listener")
@@ -44,8 +44,8 @@ if __name__ == "__main__":
                         parser.error("redcat requires --cert and --key flags when using protocol ssl in bind mode")
                 res, error = rcat.manager.listen(False, **kwargs)
             else:
-                if not "addr" in kwargs.keys(): 
-                    parser.error("redcat requires --addr flag in connect mode")
+                if not "host" in kwargs.keys(): 
+                    parser.error("redcat requires --host flag in connect mode")
                 res, error = rcat.manager.connect(**kwargs)
         if res:
             rcat.run()

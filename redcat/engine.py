@@ -44,7 +44,7 @@ class Engine:
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
         cmd_listen = redcat.command.Command("listen", self.__listen, "listen for a reverse shell", self.__on_listen_completion)
-        cmd_listen.add_argument("host", type=str, nargs="?", default="", help="address to bind")
+        cmd_listen.add_argument("host", type=str, nargs="?", default="::", help="address to bind")
         cmd_listen.add_argument("port", type=int, nargs=1, help="port to bind on")
         cmd_listen.add_argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
             default=redcat.platform.LINUX, help="expected platform")

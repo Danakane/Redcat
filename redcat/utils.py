@@ -21,7 +21,7 @@ def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) 
 def get_remotes_and_families_from_hostname(hostname: str, port: int, socktype: int = 0) -> typing.Tuple[typing.Tuple[int], typing.Tuple[typing.Any, ...]]:
     addrinfo = None
     if not hostname:
-        hostname = "0.0.0.0"
+        hostname = "::" # Use :: as default address. if /proc/sys/net/ipv6/bindv6only is set to 0 sockets will accept both IPv4 and IPv6 connections
     addrinfo = socket.getaddrinfo(hostname, port, 0, socktype)
     families = tuple([addrinfo[i][0] for i in range(len(addrinfo))])
     remotes = tuple([addrinfo[i][4] for i in range(len(addrinfo))])

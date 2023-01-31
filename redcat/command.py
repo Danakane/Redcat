@@ -4,17 +4,50 @@ import shlex
 import subprocess
 
 
+def argument(*name_or_flags, **kwargs):
+    """Convenience function to properly format arguments to pass to the
+    command and subcommand decorators.
+    """
+    return (list(name_or_flags), kwargs)
+
+
+def subcommand(parent, args=[]):
+    """Decorator to define a new subcommand in a sanity-preserving way.
+    The function will be stored in the ``func`` variable when the parser
+    parses arguments so that it can be called directly like so::
+        args = cli.parse_args()
+        args.func(args)
+    Usage example::
+        @subcommand(parser, [argument("-d", help="Enable debug mode", action="store_true")])
+        def subcommand(args):
+            print(args)
+    Then on the command line::
+        python cli.py subcommand -d
+    """
+    def decorator(func):
+        parser = parent.add_parser(func.__name__, description=func.__doc__)
+        for arg in args:
+            parser.add_argument(*arg[0], **arg[1])
+        parser.set_defaults(func=func)
+    return decorator
+
+
 class Command:
 
-    def __init__(self, name: str, fct: typing.Callable, description, callback: typing.Callable = None) -> None:
+    SUBCOMMAND: str = "subcommand"
+    FUNC: str = "func"
+
+    def __init__(self, name: str, parent: typing.Any, description: str, callback: typing.Callable = None) -> None:
         self.__name: str = name
-        self.__fct: typing.Callable = fct
+        self.__parent: typing.Any = parent
         self.__description: str = description
         self.__completion_data: typing.Dict[typing.List[str], typing.List[str]] = {
             ("-h", "--help"): []
         }
         self.__completion_callback: typing.Callable = callback
+        self.__func: typing.Callable = None
         self.__parser: argparse.ArgumentParser = argparse.ArgumentParser(prog=self.__name, description=description)
+        self.__subparsers: argparse._SubParsersAction = None
 
     @property
     def name(self) -> str:
@@ -29,8 +62,8 @@ class Command:
         return self.__parser
 
     @property
-    def fct(self) -> typing.Callable:
-        return self.__fct
+    def func(self) -> typing.Callable:
+        return self.__func
 
     def add_argument(self, *args: typing.Tuple[str, ...], **kwargs: typing.Dict[str, typing.Any]) -> None:
         if args[0].startswith("-"):
@@ -109,10 +142,46 @@ class Command:
             try:
                 parsed_args = self.__parser.parse_args(arguments)
                 kwargs = {k:v[0] if isinstance(v, list) and len(v) == 1 else v for k,v in parsed_args._get_kwargs() if v is not None}
-                res, error = self.__fct(self.parser, **kwargs)
+                if Command.SUBCOMMAND in kwargs and kwargs[Command.SUBCOMMAND]:
+                    del kwargs[Command.SUBCOMMAND]
+                    del kwargs["func"]
+                    res, error = parsed_args.func(self.__parent, **kwargs)
+                else:
+                    if Command.SUBCOMMAND in kwargs.keys():
+                        del kwargs[Command.SUBCOMMAND]
+                    if Command.FUNC in kwargs.keys():
+                        del kwargs[Command.FUNC]
+                    res, error = self.__func(self.__parent, **kwargs)
             except SystemExit:
                 res = True
                 error = ""
         return res, error
+
+    def command(self, args: typing.List[typing.Any]) -> typing.Callable:
+        """
+        Decorator to define a new command in a sanity-preserving way.
+        """
+        def decorator(func: typing.Callable) -> typing.Callable:
+            if args:
+                for arg in args:
+                    self.add_argument(*arg[0], **arg[1])
+            self.__func = func
+        return decorator
+
+    def subcommand(self, name: str, args: typing.List[typing.Any]=None) -> typing.Callable:
+        """
+        Decorator to define a new subcommand in a sanity-preserving way.
+        The function will be stored in the ``func`` variable when the parser
+        parses arguments so that it can be called directly
+        """
+        def decorator(func) -> None:
+            if not self.__subparsers:
+                self.__subparsers = self.__parser.add_subparsers(dest=Command.SUBCOMMAND)
+            parser = self.__subparsers.add_parser(name, description=func.__doc__)
+            if args:
+                for arg in args:
+                    parser.add_argument(*arg[0], **arg[1])
+            parser.set_defaults(func=func)
+        return decorator
     
 

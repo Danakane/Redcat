@@ -22,8 +22,11 @@ class TcpChannel(redcat.channel.Channel):
             self._remote = remote
             self._sock = sock
         else:
-            self._host = host
-            self._port = port
+            if not host or not port:
+                raise ValueError("invalid host or port number")
+            else:
+                self._host = host
+                self._port = port
 
     @property
     def remote(self) -> str:

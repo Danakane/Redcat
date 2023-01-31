@@ -73,7 +73,7 @@ class Engine:
             return res, error
         self.__commands[cmd_connect.name] = cmd_connect
         # listen command
-        cmd_listen = redcat.command.Command("listen", self, "listen for a reverse shell", self.__on_listen_completion)
+        cmd_listen = redcat.command.Command("listen", self, "listen for reverse shells", self.__on_listen_completion)
         @cmd_listen.subcommand(
             "tcp",
             [
@@ -87,7 +87,7 @@ class Engine:
         )
         def listen_tcp(parent: Engine, background: bool, platform: str, **kwargs) -> typing.Tuple[bool, str]:
             """
-            listen for tcp bind shell
+            listen for tcp reverse shells
             """
             res, error = parent.manager.listen(background=background, protocol=redcat.channel.ChannelProtocol.TCP, platform_name=platform, **kwargs)
             return res, error
@@ -108,7 +108,7 @@ class Engine:
         )
         def listen_ssl(parent: Engine, background: bool, platform: str, **kwargs) -> typing.Tuple[bool, str]:
             """
-            listen for ssl reverse shell
+            listen for ssl reverse shells
             """
             res, error = parent.manager.listen(background=background, protocol=redcat.channel.ChannelProtocol.SSL, platform_name=platform, **kwargs)
             return res, error
@@ -117,7 +117,7 @@ class Engine:
         cmd_kill = redcat.command.Command("kill", self, "kill the session or listener for a given id")
         @cmd_kill.command(
             [
-                redcat.command.argument("type", type=str, nargs=1, choices=["session", "listener"], help="type of object to kill"),
+                redcat.command.argument("type", type=str, nargs=1, choices=["session", "listener"], help="type of the object to kill"),
                 redcat.command.argument("id", type=str, nargs=1, help="id of object to kill")
             ]
         )
@@ -125,14 +125,14 @@ class Engine:
             """
             kill the session or listener for a given id
             """
-            res, error = parent.manager.kill(sender=None, **kwargs)
+            res, error = parent.manager.kill(**kwargs)
             return res, error
         self.__commands[cmd_kill.name] = cmd_kill
         # show command
         cmd_show = redcat.command.Command("show", self, "show available sessions or listeners")
         @cmd_show.command(
             [
-                redcat.command.argument("type", type=str, nargs=1, choices=["sessions", "listeners"], help="type of the objects to display"),
+                redcat.command.argument("type", type=str, nargs=1, choices=["sessions", "listeners"], help="type of the objects to display")
             ]
         )
         def show(parent: Engine, type: str) -> typing.Tuple[bool, str]:
@@ -201,7 +201,7 @@ class Engine:
             download a file from the remote host for a given session
             use the selected session if no id is provided
             """
-            res, error = parent.manager.download(**kwargs)
+            return parent.manager.download(**kwargs)
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
         cmd_upload = redcat.command.Command("upload", self, 
@@ -219,7 +219,7 @@ class Engine:
             upload a file to the remote host of a given session
             use the selected session if no id is provided
             """
-            res, error = parent.manager.upload(**kwargs)
+            return parent.manager.upload(**kwargs)
         self.__commands[cmd_upload.name] = cmd_upload
         # local command
         cmd_local = redcat.command.Command("local", self, "run a given command on the local system", self.__on_local_command_completion) 
@@ -418,7 +418,7 @@ class Engine:
                     print(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
             except EOFError:
                 if self.__manager.selected_id:
-                    self.__manager.remote_shell(sender=None)
+                    self.__manager.remote_shell()
             except KeyboardInterrupt:
                 print()
             except SystemExit:

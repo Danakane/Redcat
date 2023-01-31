@@ -30,8 +30,6 @@ if __name__ == "__main__":
             kwargs = {k:v[0] if isinstance(v, list) and len(v) == 1 else v for k,v in args._get_kwargs() if v is not None}
             bind = args.bind
             del kwargs["bind"]
-            if not bind and "host" not in kwargs.keys():
-                parser.error("redcat require --host flag in connect mode")
             kwargs["protocol"] = redcat.channel.ChannelProtocol.SSL if kwargs["protocol"] == "ssl" else redcat.channel.ChannelProtocol.TCP
             kwargs["platform_name"] = kwargs["platform"]
             del kwargs["platform"]
@@ -44,8 +42,6 @@ if __name__ == "__main__":
                         parser.error("redcat requires --cert and --key flags when using protocol ssl in bind mode")
                 res, error = rcat.manager.listen(False, **kwargs)
             else:
-                if not "host" in kwargs.keys(): 
-                    parser.error("redcat requires --host flag in connect mode")
                 res, error = rcat.manager.connect(**kwargs)
         if res:
             rcat.run()

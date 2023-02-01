@@ -158,11 +158,7 @@ class Engine:
         self.__commands[cmd_show.name] = cmd_show
         # select session command
         cmd_session = redcat.command.Command("session", self.__manager.select_session, "select the session for a given id (none to unselect)")
-        @cmd_session.command(
-            [
-                redcat.command.argument("type", type=str, nargs=1, choices=["sessions", "listeners"], help="id of session to select (none to unselect)"),
-            ]
-        )
+        @cmd_session.command(None)
         def session(parent: Engine, **kwargs) -> typing.Tuple[bool, str]:
             """
             select the session for a given id (none to unselect)

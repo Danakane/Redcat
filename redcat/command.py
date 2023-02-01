@@ -105,6 +105,8 @@ class Command:
         candidates = []
         subcommand = self.__find_subcommand(buffer)
         if not key:
+            if subcommand and not f" {subcommand} " in buffer:
+                candidates.append(f"{subcommand}") # case when completing "command subcommand" -> "command subcommand "
             for args in self.__completion_data[subcommand].keys():
                 if buffer:
                     already_in_buffer = False
@@ -118,7 +120,7 @@ class Command:
         else:
             for args in self.__completion_data[subcommand].keys():
                 if key in args:
-                    candidates = self.__completion_data[subcommand][args]
+                    candidates += self.__completion_data[subcommand][args]
                     break
         return candidates
 

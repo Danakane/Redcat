@@ -152,8 +152,7 @@ class Session:
                 self.__stop_evt.set()
                 res = True
             else:
-                with self.__chan.transaction_lock:
-                    res, error = self.send(byte)
+                res, error = self.send(byte)
                 if not res:
                     self.__stop_evt.set()
         if (not res) and self.__chan.is_open:

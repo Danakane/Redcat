@@ -16,7 +16,7 @@ class Engine:
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
-        # sessions managerlis
+        # sessions manager
         self.__manager: redcat.manager.Manager = redcat.manager.Manager()
         # commands
         self.__commands: typing.Dict[str, redcat.command.Command] = {}
@@ -59,8 +59,8 @@ class Engine:
                 redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform"),
-                redcat.command.argument("--cert", type=str, nargs=1, help="path of certificate for the ssl client"),
-                redcat.command.argument("--key", type=str, nargs=1, help="path of private key of the client's certificate"),
+                redcat.command.argument("--cert", type=str, nargs=1, help="path to the certificate of the ssl client"),
+                redcat.command.argument("--key", type=str, nargs=1, help="path to the private key of the client's certificate"),
                 redcat.command.argument("--password", type=str, nargs=1, help="password of the private key"),
                 redcat.command.argument("--ca-cert", type=str, nargs=1, help="CA certificate of the ssl bind shell")
             ]
@@ -100,10 +100,10 @@ class Engine:
                 redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform"),
-                redcat.command.argument("cert", type=str, nargs=1, help="path of certificate for the ssl listener"),
-                redcat.command.argument("key", type=str, nargs=1, help="path of private key of the listener's certificate"),
+                redcat.command.argument("--cert", type=str, nargs=1, help="path to the certificate of the ssl listener"),
+                redcat.command.argument("--key", type=str, nargs=1, help="path to private key of the listener's certificate"),
                 redcat.command.argument("--password", type=str, nargs=1, help="password of the private key"),
-                redcat.command.argument("--ca-cert", type=str, nargs=1, help="CA certificate of the ssl reverse shell")
+                redcat.command.argument("--ca-cert", type=str, nargs=1, help="path to the CA certificate of the ssl reverse shell")
             ]
         )
         def listen_ssl(parent: Engine, background: bool, platform: str, **kwargs) -> typing.Tuple[bool, str]:

@@ -1,5 +1,9 @@
 import typing
 import socket
+import tempfile
+import datetime
+import cryptography.x509, cryptography.x509.oid
+import cryptography.hazmat.primitives.hashes, cryptography.hazmat.primitives.serialization, cryptography.hazmat.primitives.asymmetric
 
 import redcat.style
 
@@ -29,3 +33,46 @@ def get_remotes_and_families_from_hostname(hostname: str, port: int, socktype: i
 
 def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))
+
+def generate_self_signed_cert() -> str:
+    """Generate a self-signed certificate"""
+    filename = ""
+    with tempfile.NamedTemporaryFile("wb", delete=False) as filp:
+        key = cryptography.hazmat.primitives.asymmetric.rsa.generate_private_key(public_exponent=65537, key_size=4096)
+        filp.write(
+            key.private_bytes(
+                encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+                format=cryptography.hazmat.primitives.serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=cryptography.hazmat.primitives.serialization.NoEncryption(),
+            )
+        )
+        # from: https://cryptography.io/en/latest/x509/tutorial/
+        subject = issuer = cryptography.x509.Name(
+            [
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.COUNTRY_NAME, u"US"),
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.COUNTRY_NAME, u"US"),
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.STATE_OR_PROVINCE_NAME, u"California"),
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.LOCALITY_NAME, u"San Francisco"),
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.ORGANIZATION_NAME, u"My Company"),
+                cryptography.x509.NameAttribute(cryptography.x509.oid.NameOID.COMMON_NAME, u"mysite.com"),
+            ]
+        )
+        cert = (
+            cryptography.x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(key.public_key())
+            .serial_number(cryptography.x509.random_serial_number())
+            .not_valid_before(datetime.datetime.utcnow())
+            .not_valid_after(
+                datetime.datetime.utcnow() + datetime.timedelta(days=365)
+            )
+            .add_extension(
+                cryptography.x509.SubjectAlternativeName([cryptography.x509.DNSName(u"localhost")]),
+                critical=False,
+            )
+            .sign(key, cryptography.hazmat.primitives.hashes.SHA512())
+        )
+        filp.write(cert.public_bytes(cryptography.hazmat.primitives.serialization.Encoding.PEM))
+        filename = filp.name
+    return filename

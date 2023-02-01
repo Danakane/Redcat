@@ -74,14 +74,14 @@ class Manager:
                     for id in self.__broken_sessions:
                         with self.__lock_sessions:
                             if id in self.__sessions.keys():
-                                self.kill(None, "session", id)
+                                self.kill("session", id)
                     self.__broken_sessions.clear()
             with self.__lock_broken_listeners:
                 if len(self.__broken_listeners) > 0:
                     for id in self.__broken_listeners:
                         with self.__lock_listeners:
                             if id in self.__listeners.keys():
-                                self.kill(None, "listener", id)
+                                self.kill("listener", id)
                     self.__broken_listeners.clear()
             time.sleep(0.05)
 

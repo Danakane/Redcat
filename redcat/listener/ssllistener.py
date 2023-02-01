@@ -9,11 +9,14 @@ import redcat.listener.tcplistener
 
 class SslListener(redcat.listener.tcplistener.TcpListener):
 
-    def __init__(self, cert: str, key: str, password: str = None, ca_cert: str = None, **kwargs) -> None:
+    def __init__(self, cert: str = None, key: str = None, password: str = None, ca_cert: str = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.__ssl_context: ssl.SSLContext = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        self.__ssl_context.load_cert_chain(cert, key, password)
         self.__ssl_context.check_hostname = False
+        if not (cert and key):
+            cert = key = redcat.utils.generate_self_signed_cert()
+        self.__ssl_context.load_cert_chain(cert, key, password)
+
         if ca_cert:
             self.__ssl_context.load_verify_locations(ca_cert)
             self.__ssl_context.verify_mode = ssl.CERT_REQUIRED
@@ -52,3 +55,4 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
                     print(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
                     chan = None # TODO: Think about a way to report this error
         return chan
+

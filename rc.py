@@ -24,14 +24,10 @@ if __name__ == "__main__":
         parser.add_argument("host", type=str, nargs="?", help="host to connect")
         parser.add_argument("port", type=int, nargs="?", help="port to connect")
     if main_args.protocol[0] == "ssl":
+        parser.add_argument("--cert", type=str, nargs=1, help="path to the certificate of the ssl listener or client")
+        parser.add_argument("--key", type=str, nargs=1, help="path to the private key of the listener/client's certificate")
         parser.add_argument("--password", type=str, nargs=1, help="password of the private key")
-        parser.add_argument("--ca-cert", type=str, nargs=1, help="CA certificate of the ssl reverse shell")
-        if main_args.bind:
-            parser.add_argument("cert", type=str, nargs=1, help="path of certificate for the ssl shell listener")
-            parser.add_argument("key", type=str, nargs=1, help="path of private key of the listener's certificate")
-        else:
-            parser.add_argument("--cert", type=str, nargs=1, help="path of certificate for the ssl client")
-            parser.add_argument("--key", type=str, nargs=1, help="path of private key of the client's certificate")
+        parser.add_argument("--ca-cert", type=str, nargs=1, help="path to the CA certificate of the ssl bind or reverse shell")
     args = parser.parse_args()
     with redcat.engine.Engine("redcat") as rcat:
         res = True

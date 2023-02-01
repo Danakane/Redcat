@@ -172,7 +172,6 @@ class Engine:
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
         cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
-        cmd_shell.parser.add_argument("id", type=str, nargs="?", help="id of session to spawn")
         @cmd_shell.command(
             [
                 redcat.command.argument("id", type=str, nargs="?", help="id of session to spawn"),

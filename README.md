@@ -1,6 +1,6 @@
 # Redcat
 
-A remote shell handler implemented in python for CTFs, pentests and red team exercises.
+A remote shell handler implemented in python for CTFs, pentest and red team engagements.
 
 ## Features:
 * A session manager for handling mutiple listeners and shells at once.

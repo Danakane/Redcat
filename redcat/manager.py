@@ -191,37 +191,34 @@ class Manager:
             error = redcat.utils.get_error(err)
             sess = None
         if sess:
-            res, error = sess.open()
-            if res:
-                try:
-                    sess.wait_open()
-                except KeyboardInterrupt:
-                    res = False
-                    sess = None
-                    error = redcat.style.bold("interrupted by user")
-                if sess:
-                    res1 = sess.interactive(True)
-                    if res1: 
-                        sess.start()
-                        sess.wait_stop()
-                    res2 = sess.interactive(False)
-                    res = res1 and res2
-                    if res:
-                        with self.__lock_sessions:
-                            self.__sessions[sess.id] = sess
-                            if not self.__selected_session:
-                                self.__selected_session = sess
-                                self.__selected_id = sess.id
-                        error = ""
-                    else:
-                        error = redcat.style.bold(f"session {sess.id} is broken")
+            try:
+                res, error = sess.open()
+                sess.wait_open()
+            except KeyboardInterrupt:
+                res = False
+                sess = None
+                error = redcat.style.bold("interrupted by user")
+            if sess:
+                res1 = sess.interactive(True)
+                if res1: 
+                    sess.start()
+                    sess.wait_stop()
+                res2 = sess.interactive(False)
+                res = res1 and res2
+                if res:
+                    with self.__lock_sessions:
+                        self.__sessions[sess.id] = sess
+                        if not self.__selected_session:
+                            self.__selected_session = sess
+                            self.__selected_id = sess.id
+                    error = ""
                 else:
-                    error = redcat.style.bold("failed to create session")
+                    error = redcat.style.bold(f"session {sess.id} is broken")
                 print()
         return res, error
 
     # kill a session or a listener
-    def kill(self, sender: argparse.ArgumentParser, type: str, id: str) -> typing.Tuple[bool, str]:
+    def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
         if type == "session":
@@ -248,7 +245,7 @@ class Manager:
                     error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
 
-    def select_session(self, sender: argparse.ArgumentParser, id: str) -> typing.Tuple[int, str]:
+    def select_session(self, id: str) -> typing.Tuple[int, str]:
         res = False
         error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         if id == "none":
@@ -263,7 +260,7 @@ class Manager:
             error = ""
         return res, error
 
-    def remote_shell(self, sender: argparse.ArgumentParser, id: str = "") -> typing.Tuple[bool, str]:
+    def remote_shell(self, id: str = "") -> typing.Tuple[bool, str]:
         res = False 
         if not id:
             id = self.__selected_id
@@ -315,7 +312,7 @@ class Manager:
                 info = ""
         return info
 
-    def download(self, sender: argparse.ArgumentParser, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
+    def download(self, rfile: str, lfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("download operation failed")
         rfile = shlex.quote(rfile) # to avoid remote command injection though it's kinda useless
@@ -341,7 +338,7 @@ class Manager:
                 error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error
  
-    def upload(self, sender: argparse.ArgumentParser, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
+    def upload(self, lfile: str, rfile: str, id: str = "") -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("upload operation failed")
         if not id:

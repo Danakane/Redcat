@@ -5,6 +5,7 @@ from abc import abstractmethod
 
 import redcat.channel
 
+
 class Listener:
 
     def __init__(self, id: str, platform_name: str, callback: typing.Callable = None, error_callback: typing.Callable = None) -> None:

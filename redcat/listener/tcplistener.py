@@ -8,6 +8,7 @@ import redcat.channel
 import redcat.channel.factory
 import redcat.listener
 
+
 class TcpListener(redcat.listener.Listener):
 
     def __init__(self, host: str, port: int, **kwargs) -> None:
@@ -18,7 +19,6 @@ class TcpListener(redcat.listener.Listener):
         self._families: int = 0
         self._socks: typing.List[socket.socket] = []
         
-
     @property
     def endpoint(self) -> str:
         res = ""

@@ -7,6 +7,7 @@ import cryptography.hazmat.primitives.hashes, cryptography.hazmat.primitives.ser
 
 import redcat.style
 
+
 def extract_data(raw: bytes, start: bytes, end: bytes=b"", reverse: bool=False) -> None:
     start_index = 0
     if reverse:

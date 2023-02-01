@@ -4,6 +4,7 @@ import typing
 
 import redcat.platform
 
+
 class Transaction:
 
     def __init__(self, payload: bytes, pltf: redcat.platform.Platform, handle_echo: bool = False, timeout:int=30) -> None:

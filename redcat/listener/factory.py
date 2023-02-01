@@ -3,6 +3,7 @@ import typing
 import redcat.channel
 import redcat.listener, redcat.listener.tcplistener, redcat.listener.ssllistener
 
+
 def get_listener(protocol: int, **kwargs) -> redcat.listener.Listener:
     new_listener = None
     if protocol == redcat.channel.ChannelProtocol.TCP:

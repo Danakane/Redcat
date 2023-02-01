@@ -9,6 +9,7 @@ import redcat.platform
 import redcat.manager
 import redcat.engine
 
+
 if __name__ == "__main__":
     cli = argparse.ArgumentParser(description = "redcat: a remote shell handler implemented in python for CTFs, pentest and red team engagements.", add_help=False)
     cli.add_argument("--protocol", type=str, nargs=1, choices=["tcp", "ssl"], default="tcp", help="channel protocol")

@@ -1,5 +1,6 @@
 import typing
 
+
 PURPLE = "\001\033[95m\002"
 CYAN = "\001\033[96m\002"
 DARKCYAN = "\001\033[36m\002"

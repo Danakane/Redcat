@@ -2,9 +2,11 @@ import argparse
 import readline
 import shlex
 import typing
+import threading
 import subprocess
 import sys
 import os
+import signal
 
 import redcat.style
 import redcat.command
@@ -13,12 +15,23 @@ import redcat.manager
 
 
 class Engine:
-    
+
+    class MainThreadInterrupt(Exception):
+        """
+        Exception class specifically designed to interrupt the main thread
+        """
+        def __init__(self) -> None:
+            pass
+
+    def interrupt(signum, frame):
+        raise Engine.MainThreadInterrupt()
+
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
+        self.__interruptible: bool = False
         # sessions manager
-        self.__manager: redcat.manager.Manager = redcat.manager.Manager()
+        self.__manager: redcat.manager.Manager = redcat.manager.Manager(logger_callback=self.__on_log_message)
         # commands
         self.__commands: typing.Dict[str, redcat.command.Command] = {}
         # exit command
@@ -400,13 +413,32 @@ class Engine:
         prompt = redcat.style.bold(redcat.style.yellow(f"[{info}]")) + " " + redcat.style.bold(redcat.style.green(self.__name)) + "🐈 "
         return prompt
 
+    def __on_log_message(self, msg: str) -> None:
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+        print(msg)
+        sys.stdout.flush()
+        if self.__interruptible:
+            os.kill(os.getpid(),signal.SIGUSR1)
+
     def run(self) -> None:
+        """
+        This is the Engine class main loop
+        """
+        # main thread interruption signal
+        original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
+        # start manager
         self.__manager.start()
         self.__running = True
         while self.__running:
             try:
                 prompt = self.__get_prompt()
-                cmd =  input(prompt) 
+                # only interrupt main thread when waiting for input
+                signal.signal(signal.SIGUSR1, Engine.interrupt)
+                self.__interruptible = True
+                cmd =  input(prompt)
+                self.__interruptible = False
+                signal.signal(signal.SIGUSR1, original_sigusr1_handler)
                 res, error = self.__call(cmd)
                 if not res:
                     if not error:
@@ -415,12 +447,18 @@ class Engine:
             except EOFError:
                 if self.__manager.selected_id:
                     self.__manager.remote_shell()
+                else:
+                    print()
             except KeyboardInterrupt:
                 print()
-            except SystemExit:
-                print()
-                break
+            except Engine.MainThreadInterrupt:
+                pass
+            finally:
+                self.__interruptible = False
+        # stop the manager
         self.__manager.stop()
+        # restore the original signal handler
+        signal.signal(signal.SIGUSR1, original_sigusr1_handler)
 
     def __enter__(self):
         return self

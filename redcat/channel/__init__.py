@@ -25,7 +25,7 @@ class ChannelState(enum.Enum):
 
 class Channel(abc.ABC):
 
-    def __init__(self, error_callback: typing.Callable = None) -> None:
+    def __init__(self, error_callback: typing.Callable = None, logger_callback: typing.Callable = None) -> None:
         self.__thread: threading.Thread = None
         self.__state: int = ChannelState.CLOSED
         self.__stop_evt: threading.Event = threading.Event()
@@ -35,6 +35,7 @@ class Channel(abc.ABC):
         self.__queue_lock: threading.Lock = threading.Lock()
         self.__transaction_lock: threading.RLock = threading.RLock()
         self.__error_callback: typing.Callable = error_callback
+        self.__logger_callback: typing.Callable = logger_callback
 
     @property
     def is_open(self) -> bool:
@@ -69,6 +70,10 @@ class Channel(abc.ABC):
         self.__error_callback = callback
 
     @property
+    def logger_callback(self) -> None:
+        return self.__logger_callback
+
+    @property
     @abstractmethod
     def remote(self) -> str:
         pass
@@ -93,9 +98,9 @@ class Channel(abc.ABC):
     def on_open(self) -> typing.Tuple[bool, str]:
         pass
 
-    @abstractmethod
     def on_connection_established(self) -> None:
-        pass
+        if self.__logger_callback:
+            self.__logger_callback("Connection established")
 
     @abstractmethod
     def on_close(self) -> None:

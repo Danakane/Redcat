@@ -1,7 +1,5 @@
 import typing
 import socket
-import tempfile
-import datetime
 
 import redcat.style
 
@@ -32,3 +30,5 @@ def get_remotes_and_families_from_hostname(hostname: str, port: int, socktype: i
 
 def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))
+
+ 

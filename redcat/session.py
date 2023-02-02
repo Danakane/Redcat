@@ -9,15 +9,17 @@ import redcat.transaction
 
 class Session: 
 
-    def __init__(self, id: str, error_callback: typing.Callable, platform_name: str, chan: redcat.channel.Channel=None, **kwargs) -> None:
+    def __init__(self, id: str, error_callback: typing.Callable, logger_callback: typing.Callable, 
+                    platform_name: str, chan: redcat.channel.Channel=None, **kwargs) -> None:
         self.__id: str = id
         self.__error_callback: typing.Callable = error_callback
+        self.__logger_callback: typing.Callable = logger_callback
         self.__chan: redcat.channel.Channel = None
         self.__platform: redcat.platform.Platform = None
         if chan:
             self.__chan = chan
         else:
-            self.__chan = redcat.channel.factory.get_channel(**kwargs)
+            self.__chan = redcat.channel.factory.get_channel(logger_callback=self.__logger_callback, **kwargs)
         if self.__chan:
             self.__chan.error_callback = self.on_error
             self.__platform = redcat.platform.factory.get_platform(self.__chan, platform_name)

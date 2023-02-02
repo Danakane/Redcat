@@ -13,7 +13,8 @@ import redcat.session
 
 class Manager:
 
-    def __init__(self) -> None:
+    def __init__(self, logger_callback: typing.Callable = None) -> None:
+        self.__logger_callback: typing.Callable = logger_callback
         self.__lock_sessions: threading.Lock = threading.RLock()
         self.__sessions: typing.Dict[str, redcat.session.Session] = {}
         self.__lock_broken_sessions: threading.Lock = threading.RLock()
@@ -91,7 +92,7 @@ class Manager:
         with self.__lock_sessions:
             id = str(self.__sessions_last_id)
             self.__sessions_last_id += 1
-        sess = redcat.session.Session(id=id, error_callback=self.on_error, chan=chan, platform_name=platform_name)
+        sess = redcat.session.Session(id=id, error_callback=self.on_error, logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
         sess.open()
         while sender.running:
             if sess.wait_open(0.1):
@@ -108,6 +109,8 @@ class Manager:
                             self.__selected_session = sess
                             self.__selected_id = sess.id
                         res = True
+                        if self.__logger_callback:
+                            self.__logger_callback(f"session {redcat.style.bold(redcat.style.blue(sess.id))}, connected to {sess.user}@{sess.hostname}, is now ready")
                     break
         if not res:
             sess.close()
@@ -124,7 +127,7 @@ class Manager:
                 with self.__lock_listeners:
                     listener_id = str(self.__listeners_last_id)
                     self.__listeners_last_id += 1
-                new_listener = redcat.listener.factory.get_listener(id=listener_id, error_callback=self.on_error, **kwargs)
+                new_listener = redcat.listener.factory.get_listener(id=listener_id, error_callback=self.on_error, logger_callback=self.__logger_callback, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -136,7 +139,7 @@ class Manager:
                         with self.__lock_sessions:
                             id = str(self.__sessions_last_id)
                             self.__sessions_last_id += 1
-                        sess = redcat.session.Session(id=id, error_callback=self.on_error, chan=chan, platform_name=platform_name)
+                        sess = redcat.session.Session(id=id, error_callback=self.on_error, logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
                         sess.open()
                         sess.wait_open()
                 except KeyboardInterrupt:
@@ -167,7 +170,8 @@ class Manager:
                 with self.__lock_listeners:
                     listener_id = str(self.__listeners_last_id)
                     self.__listeners_last_id += 1
-                new_listener = redcat.listener.factory.get_listener(id=listener_id, callback=self.__on_new_channel, error_callback=self.on_error, **kwargs)
+                new_listener = redcat.listener.factory.get_listener(id=listener_id, callback=self.__on_new_channel, 
+                                    error_callback=self.on_error, logger_callback=self.__logger_callback, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -186,7 +190,7 @@ class Manager:
             with self.__lock_sessions:
                 id = str(self.__sessions_last_id)
                 self.__sessions_last_id += 1
-            sess = redcat.session.Session(id=id, error_callback=self.on_error, **kwargs)
+            sess = redcat.session.Session(id=id, error_callback=self.on_error, logger_callback=self.__logger_callback, **kwargs)
         except Exception as err:
             error = redcat.utils.get_error(err)
             sess = None
@@ -327,7 +331,9 @@ class Manager:
                         f.write(data)
                 except FileNotFoundError:
                     res = False
-                    error = redcat.style.bold("cannot write local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) + redcat.style.bold(": parent directory not found")
+                    error = redcat.style.bold("cannot write local file ") + \
+                                redcat.style.bold(redcat.style.red(f"{lfile}")) + \
+                                redcat.style.bold(": parent directory not found")
                 except PermissionError:
                     res = False
                     error = redcat.style.bold("don't have permission to write local file ") + redcat.style.bold(redcat.style.red(f"{lfile}")) 
@@ -368,7 +374,7 @@ class Manager:
     def on_error(self, sender: typing.Any, error: str) -> None:
         if not threading.current_thread() is threading.main_thread():
             # on main thread, the error will be displayed after the command terminate
-            print(redcat.style.bold(redcat.style.red("[!] error: ") + error))
+            self.__logger_callback(redcat.style.bold(redcat.style.red("[!] error: ") + error))
         if isinstance(sender, redcat.session.Session):
             if self.__selected_id == id:
                 self.__selected_id = ""

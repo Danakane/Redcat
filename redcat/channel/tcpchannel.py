@@ -75,9 +75,9 @@ class TcpChannel(redcat.channel.Channel):
                 self._sock = None
 
     def on_connection_established(self) -> None:
-        if self.is_open:
-            print(f"Connected to remote {self._remote[0]}:{self._remote[1]}", end="")
-            sys.stdout.flush()
+        if self.is_open and self.logger_callback:
+            remote = f"{self._remote[0]}:{self._remote[1]}"
+            self.logger_callback(f"Connected to remote {redcat.style.bold(redcat.style.blue(remote))}")
 
     def recv(self) -> typing.Tuple[bool, str, bytes]:
         res = False

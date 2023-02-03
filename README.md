@@ -19,6 +19,18 @@ redcat handles the low level communications and allow the user to easily manage 
 redcat mostly supports linux target platforms but minimal also provide minimal support for windows targets.
 
 
+## Usage
+
+redcat can be started in interactive mode by executing the script `rc.py`.
+
+
+```zsh
+python rc.py
+```
+
+It's also possible to start it in listening mode or connect mode directly using the script options.
+
+
 ## Sessions
 
 A session represents a single instance of communication between the attacker and a remote shell.
@@ -61,7 +73,10 @@ redcat supports tcp and ssl/tls protocols.
 redcat supports mostly linux targets platform: Upon receiving a new linux connection (either bind a shell or a reverse shell) it will performe the following actions:
 * Disabling shell command-line history
 * Enumerate usefuls binaries using `which`.
-* Spawn a pty shell for a fully interactive shell session
+* Spawn a pty shell
+* Setup the local terminal in raw mode
+* synchronize the remote pty settings (columns, rows and `TERM`) with the local settings
+* Pick a shell among the available binaries on the remote system
 * Normalize the shell prompt
 
 For windows, no particular action are performed, however CTRL+C events are ignored.

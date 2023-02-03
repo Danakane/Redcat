@@ -49,6 +49,8 @@ To pause a session's shell and go back to redcat main console, the user must pre
 
 Finally to terminate a session, the user can call the `kill session` command or `exit` the tool.
 
+Note: The tool starts 1 thread for each session plus a second for the spawned shell.
+
 
 ## Listeners
 
@@ -63,6 +65,8 @@ A listener can be created using the `listen` command. If the `-b, --background` 
 Otherwise the listener will only accept a single reverse shell.
 
 To terminate a listener,  the user can call the `kill listener` command or `exit` the tool. 
+
+Note: The tool starts 1 thread for each listener.
 
 ## Protocols
 
@@ -79,11 +83,11 @@ redcat supports mostly linux targets platform: Upon receiving a new linux connec
 * Pick a shell among the available binaries on the remote system
 * Normalize the shell prompt
 
-For windows, no particular action are performed, however CTRL+C events are ignored.
+For windows, only cmd shell is supported and no particular action are performed (no pty, no raw mode), however keyboard interruption are ignored and won't break the shell.
 
 ## Upload/Download
 
-redcat provide basic data exfiltration using base64 encoding. While it can easily download any file, the upload function is much more limited in performance and can't be used to transfert any file bigger than a few Mb.
+redcat provides basic data exfiltration using base64 encoding. While it can easily download any file, the upload function is much more limited in performance and can't be used to transfert any file bigger than a few Mb.
 
 file uploads can be performed via the `upload` command.
 

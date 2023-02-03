@@ -38,7 +38,7 @@ To pause a session's shell and go back to redcat main console, the user must pre
 Finally to terminate a session, the user can call the `kill session` command or `exit` the tool.
 
 
-## Listing listener
+## Listeners
 
 Listeners are used to catch reverse shells.
 
@@ -69,6 +69,10 @@ For windows, no particular action are performed, however CTRL+C events are ignor
 ## Upload/Download
 
 redcat provide basic data exfiltration using base64 encoding. While it can easily download any file, the upload function is much more limited in performance and can't be used to transfert any file bigger than a few Mb.
+
+file uploads can be performed via the `upload` command.
+
+file downloads can be performed via the `download` command.
 
 ## Capture
 

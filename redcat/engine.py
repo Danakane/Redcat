@@ -171,13 +171,17 @@ class Engine:
             return res, error
         self.__commands[cmd_show.name] = cmd_show
         # select session command
-        cmd_session = redcat.command.Command("session", self.__manager.select_session, "select the session for a given id (none to unselect)")
-        @cmd_session.command(None)
+        cmd_session = redcat.command.Command("session", self, "select the session for a given id (none to unselect)")
+        @cmd_session.command(
+            [
+                redcat.command.argument("id", type=str, nargs=1, help="id of the session")
+            ]
+        )
         def session(parent: Engine, **kwargs) -> typing.Tuple[bool, str]:
             """
             select the session for a given id (none to unselect)
             """
-            res, error = parent.manager.session(**kwargs)
+            res, error = parent.manager.select_session(**kwargs)
             return res, error
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command

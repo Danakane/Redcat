@@ -110,7 +110,9 @@ class Manager:
                             self.__selected_id = sess.id
                         res = True
                         if self.__logger_callback:
-                            self.__logger_callback(f"session {redcat.style.bold(redcat.style.blue(sess.id))}, connected to {sess.user}@{sess.hostname}, is now ready")
+                            self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))} " + 
+                                f"session {redcat.style.bold(redcat.style.darkcyan(sess.id))}, " + 
+                                f"connected to {redcat.style.bold(redcat.style.blue(sess.user + '@' + sess.hostname))}, is now ready")
                     break
         if not res:
             sess.close()

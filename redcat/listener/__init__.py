@@ -64,7 +64,9 @@ class Listener:
         if res:
             self.__thread = threading.Thread(target=self.__run)
             self.__thread.start()
-            self.__logger_callback(f"listener {redcat.style.blue(self.__id)} created and listening on {self.endpoint}")
+            self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(self.protocol[1]))} listener " + 
+                f"{redcat.style.bold(redcat.style.darkcyan(self.__id))} created " +
+                f"and listening on {redcat.style.bold(redcat.style.blue(self.endpoint))}")
         else:
             self.__error_callback(self, error)
         return res, error

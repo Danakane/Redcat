@@ -1,5 +1,6 @@
 import typing
 import socket
+import signal
 
 import redcat.style
 
@@ -31,4 +32,35 @@ def get_remotes_and_families_from_hostname(hostname: str, port: int, socktype: i
 def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))
 
- 
+
+class MainThreadInterruptionActivator:
+    """ 
+    A simple helper class to manage the main thread interruption system
+    It takes a setter to flag attribute that indicate if the main thread can be interrupted
+    and set the flag to True when entering and to False when exiting a with block
+    """
+    def __init__(self, switch: typing.Callable) -> None:
+        self.__switch: typing.Callable = switch
+        self.__original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
+
+    def __enter__(self):
+        signal.signal(signal.SIGUSR1, MainThreadInterruptionActivator.interrupt)
+        self.__switch(True)
+        return self
+
+    def __exit__(self, type, value, traceback) -> None:
+        self.__switch(False)
+        signal.signal(signal.SIGUSR1, self.__original_sigusr1_handler)
+
+    def interrupt(signum, frame):
+        raise MainThreadInterrupt()
+
+
+class MainThreadInterrupt(Exception):
+    """
+    Exception class specifically designed to interrupt the main thread
+    """
+    def __init__(self) -> None:
+        pass
+
+

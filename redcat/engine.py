@@ -16,20 +16,11 @@ import redcat.manager
 
 class Engine:
 
-    class MainThreadInterrupt(Exception):
-        """
-        Exception class specifically designed to interrupt the main thread
-        """
-        def __init__(self) -> None:
-            pass
-
-    def interrupt(signum, frame):
-        raise Engine.MainThreadInterrupt()
-
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
         self.__interruptible: bool = False
+        self.__interruption_lock: threading.Lock = threading.Lock()
         # sessions manager
         self.__manager: redcat.manager.Manager = redcat.manager.Manager(logger_callback=self.__on_log_message)
         # commands
@@ -298,6 +289,9 @@ class Engine:
     def running(self) -> bool:
         return self.__running
 
+    def interruptible(self, value: bool) -> None:
+        self.__interruptible = value
+
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
         if state == 0:
@@ -418,19 +412,19 @@ class Engine:
         return prompt
 
     def __on_log_message(self, msg: str) -> None:
-        sys.stdout.write("\r\033[K")
-        sys.stdout.flush()
-        print(msg)
-        sys.stdout.flush()
         if self.__interruptible:
-            os.kill(os.getpid(),signal.SIGUSR1)
+            sys.stdout.write("\r\033[K")
+            sys.stdout.flush()
+            print(msg)
+            sys.stdout.flush()
+            with self.__interruption_lock:
+                if self.__interruptible:
+                    os.kill(os.getpid(),signal.SIGUSR1)
 
     def run(self) -> None:
         """
         This is the Engine class main loop
         """
-        # main thread interruption signal
-        original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
         # start manager
         self.__manager.start()
         self.__running = True
@@ -438,11 +432,9 @@ class Engine:
             try:
                 prompt = self.__get_prompt()
                 # only interrupt main thread when waiting for input
-                signal.signal(signal.SIGUSR1, Engine.interrupt)
-                self.__interruptible = True
-                cmd =  input(prompt)
-                self.__interruptible = False
-                signal.signal(signal.SIGUSR1, original_sigusr1_handler)
+                cmd = None
+                with redcat.utils.MainThreadInterruptionActivator(self.interruptible):
+                    cmd =  input(prompt)
                 res, error = self.__call(cmd)
                 if not res:
                     if not error:
@@ -455,14 +447,10 @@ class Engine:
                     print()
             except KeyboardInterrupt:
                 print()
-            except Engine.MainThreadInterrupt:
+            except redcat.utils.MainThreadInterrupt:
                 pass
-            finally:
-                self.__interruptible = False
         # stop the manager
         self.__manager.stop()
-        # restore the original signal handler
-        signal.signal(signal.SIGUSR1, original_sigusr1_handler)
 
     def __enter__(self):
         return self

@@ -55,17 +55,17 @@ class Manager:
             self.__garbage_collector = None
 
     def clear(self) -> None:
-        # stop all listeners
-        for listen_endpoint in self.__listeners.values():
-            listen_endpoint.stop()
         with self.__lock_listeners:
-            self.__listeners.clear()
-        # stop and close all sessions
-        for sess in self.__sessions.values():
-            sess.stop()
-            sess.interactive(False)
-            sess.close()
+        # stop all listeners
+            for listen_endpoint in self.__listeners.values():
+                listen_endpoint.stop()
+            self.__listeners.clear()  
         with self.__lock_sessions:
+            # stop and close all sessions
+            for sess in self.__sessions.values():
+                sess.stop()
+                sess.interactive(False)
+                sess.close()
             self.__sessions.clear()
 
     def __clean_broken_sessions_and_listeners(self) -> None:

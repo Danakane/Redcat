@@ -86,7 +86,7 @@ class Command:
             self.__completion_data[subcommand][args] = []
             if "choices" in kwargs.keys():
                 for choice in kwargs["choices"]:
-                    self.__completion_data[subcommand][args].append(tuple([choice]))
+                    self.__completion_data[subcommand][args].append(choice)
         else:
             # it's positional argument
             if "choices" in kwargs.keys():
@@ -101,12 +101,11 @@ class Command:
                 break
         return subcommand
 
-    def __get_completion_candidates(self, buffer: str , key: str = None) -> typing.List[str]:
+    def __get_completion_candidates(self, subcommand: str, buffer: str = None, flag: str = None) -> typing.List[str]:
         candidates = []
-        subcommand = self.__find_subcommand(buffer)
-        if not key:
-            if subcommand and not f" {subcommand} " in buffer:
-                candidates.append(f"{subcommand}") # case when completing "command subcommand" -> "command subcommand "
+        if not flag:
+            #if subcommand and not f" {subcommand} " in buffer:
+            #   candidates.append(f"{subcommand}") # case when completing "command subcommand" -> "command subcommand "
             for args in self.__completion_data[subcommand].keys():
                 if buffer:
                     already_in_buffer = False
@@ -119,7 +118,7 @@ class Command:
                     candidates += list(args)
         else:
             for args in self.__completion_data[subcommand].keys():
-                if key in args:
+                if flag in args:
                     candidates += self.__completion_data[subcommand][args]
                     break
         return candidates
@@ -127,22 +126,23 @@ class Command:
     def complete(self, buffer, text) -> typing.List[str]: 
         matches = []
         words = shlex.split(buffer, posix=False)
+        subcommand = self.__find_subcommand(buffer)
         if len(words) == 1:
             if self.__completion_callback:
                 matches += self.__completion_callback(buffer, text)
             if not matches:
-                matches += [f"{s} " for s in self.__get_completion_candidates(buffer) if s]
+                matches += [f"{s} " for s in self.__get_completion_candidates(subcommand) if s]
         elif len(words) == 2:
             if self.__completion_callback:
                 matches += self.__completion_callback(buffer, text)
             if not matches:
                 if text:
-                    matches += [f"{s} " for s in self.__get_completion_candidates(buffer) if s and s.startswith(text)]
+                    matches += [f"{s} " for s in self.__get_completion_candidates(subcommand) if s and s.startswith(text)]
                 else:
                     previous = words[-1]
-                    matches += [f"{s} " for s in self.__get_completion_candidates(buffer, previous) if s and s.startswith(text)]
+                    matches += [f"{s} " for s in self.__get_completion_candidates(subcommand, flag=previous) if s and s.startswith(text)]
                 if not matches:
-                    matches += [f"{s} " for s in self.__get_completion_candidates(buffer) if s and s.startswith(text)] 
+                    matches += [f"{s} " for s in self.__get_completion_candidates(subcommand, buffer) if s and s.startswith(text)] 
         else:
             if self.__completion_callback:
                 matches += self.__completion_callback(buffer, text)
@@ -152,10 +152,10 @@ class Command:
                     previous = words[-2]
                 else:
                     previous = words[-1]
-                if previous in self.__get_completion_candidates(buffer):
-                    matches += [f"{s} " for s in self.__get_completion_candidates(buffer, previous) if s and s.startswith(text)]
+                if previous in self.__get_completion_candidates(subcommand):
+                        matches += [f"{s} " for s in self.__get_completion_candidates(subcommand, flag=previous) if s and s.startswith(text)]
                 if not matches:
-                    matches += [f"{s} " for s in self.__get_completion_candidates(buffer) if s and s.startswith(text)] 
+                    matches += [f"{s} " for s in self.__get_completion_candidates(subcommand, buffer) if s and s.startswith(text)] 
         return matches
 
     def exec(self, cmd_line: str) -> bool:

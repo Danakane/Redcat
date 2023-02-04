@@ -104,6 +104,8 @@ class Command:
     def __get_completion_candidates(self, subcommand: str, buffer: str = None, flag: str = None) -> typing.List[str]:
         candidates = []
         if not flag:
+            if buffer and subcommand and not f" {subcommand} " in buffer:
+                candidates.append(f"{subcommand}") # case when completing "command 
             for args in self.__completion_data[subcommand].keys():
                 if buffer:
                     already_in_buffer = False

@@ -1,6 +1,8 @@
 import typing
 import socket
 import signal
+import threading
+import os
 
 import redcat.style
 
@@ -33,26 +35,44 @@ def get_error(err: Exception) -> str:
     return redcat.style.bold(": ".join(str(arg) for arg in err.args))
 
 
-class MainThreadInterruptionActivator:
+class MainThreadInterruptibleSection:
     """ 
-    A simple helper class to manage the main thread interruption system
+    A Helper class to manage the main thread interruption system
     It takes a setter to flag attribute that indicate if the main thread can be interrupted
     and set the flag to True when entering and to False when exiting a with block
     """
-    def __init__(self, switch: typing.Callable) -> None:
-        self.__switch: typing.Callable = switch
+    def __init__(self) -> None:
+        self.__lock: threading.Lock = threading.Lock()
+        self.__is_interruptible_event: threading.Event = threading.Event()
         self.__original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
 
+    def interrupter(self, func: typing.Callable) -> typing.Callable:
+        def decorator(*args, **kwargs) -> None:
+            with self.__lock:
+                if threading.current_thread() != threading.main_thread():
+                    self.__is_interruptible_event.wait()
+                res = func(*args, **kwargs)
+                if threading.current_thread() != threading.main_thread():
+                    os.kill(os.getpid(),signal.SIGUSR1)
+                    self.__is_interruptible_event.clear()
+            return res
+        return decorator
+
+    def interruptible(self, func: typing.Callable) -> typing.Callable:
+        def decorator(*args, **kwargs) -> typing.Any:
+            with self:
+                return func(*args, **kwargs)
+        return decorator
+
     def __enter__(self):
-        signal.signal(signal.SIGUSR1, MainThreadInterruptionActivator.interrupt)
-        self.__switch(True)
+        signal.signal(signal.SIGUSR1, MainThreadInterruptibleSection.on_signal)
+        self.__is_interruptible_event.set()
         return self
 
     def __exit__(self, type, value, traceback) -> None:
-        self.__switch(False)
         signal.signal(signal.SIGUSR1, self.__original_sigusr1_handler)
 
-    def interrupt(signum, frame):
+    def on_signal(signum, frame):
         raise MainThreadInterrupt()
 
 

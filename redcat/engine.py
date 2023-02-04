@@ -19,8 +19,10 @@ class Engine:
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
-        self.__interruptible: bool = False
-        self.__interruption_lock: threading.Lock = threading.Lock()
+        # main thread interruptible section
+        self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection()
+        self.__input = self.__interruptible_section.interruptible(self.__input)
+        self.__on_log_message = self.__interruptible_section.interrupter(self.__on_log_message)
         # sessions manager
         self.__manager: redcat.manager.Manager = redcat.manager.Manager(logger_callback=self.__on_log_message)
         # commands
@@ -289,9 +291,6 @@ class Engine:
     def running(self) -> bool:
         return self.__running
 
-    def interruptible(self, value: bool) -> None:
-        self.__interruptible = value
-
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
         if state == 0:
@@ -412,14 +411,13 @@ class Engine:
         return prompt
 
     def __on_log_message(self, msg: str) -> None:
-        if self.__interruptible:
-            sys.stdout.write("\r\033[K")
-            sys.stdout.flush()
-            print(msg)
-            sys.stdout.flush()
-            with self.__interruption_lock:
-                if self.__interruptible:
-                    os.kill(os.getpid(),signal.SIGUSR1)
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+        print(msg)
+        sys.stdout.flush()
+
+    def __input(self, prompt: str) -> str:
+        return input(prompt)
 
     def run(self) -> None:
         """
@@ -431,10 +429,7 @@ class Engine:
         while self.__running:
             try:
                 prompt = self.__get_prompt()
-                # only interrupt main thread when waiting for input
-                cmd = None
-                with redcat.utils.MainThreadInterruptionActivator(self.interruptible):
-                    cmd =  input(prompt)
+                cmd = self.__input(prompt)
                 res, error = self.__call(cmd)
                 if not res:
                     if not error:

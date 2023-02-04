@@ -1,5 +1,6 @@
 import sys
 import threading
+import time
 import typing
 
 import redcat.channel, redcat.channel.factory
@@ -143,6 +144,7 @@ class Session:
                         pass
                 data = b""
             sys.stdout.flush()
+            time.sleep(0.001)
 
     def __run_writer(self) -> None:
         self.__running = True

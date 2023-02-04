@@ -61,6 +61,12 @@ class TcpChannel(redcat.channel.Channel):
             error = ""
         return res, error
 
+    def fileno(self) -> int:
+        fileno = -1
+        if self._sock:
+            fileno = self._sock.fileno()
+        return fileno
+
     def on_open(self) -> typing.Tuple[bool, str]:
         return self.connect()
 

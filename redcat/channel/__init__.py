@@ -1,5 +1,6 @@
 import enum
 import queue
+import select
 import sys
 import threading
 import time
@@ -26,9 +27,7 @@ class ChannelState(enum.Enum):
 class Channel(abc.ABC):
 
     def __init__(self, error_callback: typing.Callable = None, logger_callback: typing.Callable = None) -> None:
-        self.__thread: threading.Thread = None
         self.__state: int = ChannelState.CLOSED
-        self.__stop_evt: threading.Event = threading.Event()
         self.__ready_evt: threading.Event = threading.Event()
         self.__has_data_evt: threading.Event() = threading.Event()
         self.__dataqueue: typing.Queue = queue.Queue()
@@ -36,6 +35,7 @@ class Channel(abc.ABC):
         self.__transaction_lock: threading.RLock = threading.RLock()
         self.__error_callback: typing.Callable = error_callback
         self.__logger_callback: typing.Callable = logger_callback
+        self.__register: GlobalChannelRegister = GlobalChannelRegister()
 
     @property
     def is_open(self) -> bool:
@@ -70,6 +70,14 @@ class Channel(abc.ABC):
         self.__error_callback = callback
 
     @property
+    def is_ready(self) -> bool:
+        return self.__ready_evt.is_set()
+
+    @is_ready.setter
+    def is_ready(self, value: bool) -> None:
+        self.__ready_evt.set() if value else self.__ready_evt.clear()
+
+    @property
     def logger_callback(self) -> None:
         return self.__logger_callback
 
@@ -81,6 +89,10 @@ class Channel(abc.ABC):
     @property
     @abstractmethod
     def protocol(self) -> typing.Tuple[int, str]:
+        pass
+
+    @abstractmethod
+    def fileno(self) -> int:
         pass
 
     @abstractmethod
@@ -110,15 +122,17 @@ class Channel(abc.ABC):
         self.__state = ChannelState.OPENNING
         res, error = self.on_open()
         if res:
-            self.__thread = threading.Thread(target=self.__run)
-            self.__thread.start()
+            self.__register.register(self) # must be called after on_open
+            self.__state = ChannelState.OPEN
+            self.on_connection_established()
+            self.is_ready = True
         return res, error
 
     def close(self) -> None:
         self.__state = ChannelState.CLOSING
-        self.__stop_evt.set()
+        self.is_ready = False
+        self.__register.remove(self) # must be called before on_close
         self.on_close()
-        self.__thread.join()
         self.__state = ChannelState.CLOSED
 
     def error(self, err: str) -> None:
@@ -127,10 +141,16 @@ class Channel(abc.ABC):
             self.on_error(err)
             self.__error_callback(self, err)
 
-    def collect(self, data: bytes) -> None:
-        with self.__queue_lock:
-            self.__dataqueue.put(data)
-            self.__has_data_evt.set()
+    def receive(self) -> None:
+        with self.__transaction_lock: 
+            res, error, data = self.recv()
+            if not res:
+                self.error(error)
+                self.__register.remove(self)
+            else:
+                with self.__queue_lock:
+                    self.__dataqueue.put(data)
+                    self.__has_data_evt.set()
 
     def retrieve(self, n: int=0) -> bytes:
         data: typing.List[bytes] = []
@@ -213,21 +233,6 @@ class Channel(abc.ABC):
     def wait_data(self, timeout=None) -> None:
        return self.__has_data_evt.wait(timeout)
 
-    def __run(self) -> None:
-        self.__state = ChannelState.OPEN
-        self.__ready_evt.set()
-        self.on_connection_established()
-        while not self.__stop_evt.is_set():
-            with self.__transaction_lock:
-                res, error, data = self.recv()
-                if not res:
-                    self.error(error)
-                    self.__stop_evt.set()
-                else:
-                    if data:
-                        self.collect(data)
-            time.sleep(0.05) # small delay to prevent transaction starvation
-
     def __enter__(self):
         self.open()
         return self
@@ -235,3 +240,33 @@ class Channel(abc.ABC):
     def __exit__(self, type, value, traceback) -> None:
         self.close()
 
+
+class GlobalChannelRegister(metaclass=redcat.utils.Singleton):
+
+    def __init__(self) -> None:
+        self.__channels: typing.List[Channel] = []
+        self.__lock: threading.RLock = threading.RLock()
+        self.__thread: threading.Thread = None
+
+    def register(self, channel: Channel) -> None:
+        with self.__lock:
+            self.__channels.append(channel)
+            if not self.__thread:
+                self.__thread: threading.Thread = threading.Thread(target=self.__run)
+                self.__thread.start()
+    
+    def remove(self, channel: Channel) -> None:
+        with self.__lock:
+            if channel in self.__channels:
+                self.__channels.remove(channel)
+
+    def __run(self) -> None:
+        while self.__channels:
+            with self.__lock:
+                readables, _, _ = select.select(self.__channels, [], [], 0.01)
+            if readables:
+                for channel in readables:
+                    channel.receive()
+            time.sleep(0.01)
+                    
+        

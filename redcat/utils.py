@@ -44,6 +44,10 @@ class MainThreadInterruptibleSection:
         self.__is_interruptible: bool = False
         self.__original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
 
+    @property
+    def is_interruptible(self) -> bool:
+        return self.__is_interruptible
+
     def interrupter(self, func: typing.Callable) -> typing.Callable:
         def decorator(*args, **kwargs) -> None:
             res = func(*args, **kwargs)
@@ -80,3 +84,12 @@ class MainThreadInterrupt(Exception):
         pass
 
 
+class Singleton(type):
+    """
+    Singleton metaclass 
+    """
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]

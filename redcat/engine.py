@@ -8,6 +8,7 @@ import sys
 import os
 import signal
 import time
+import datetime
 
 import redcat.style
 import redcat.command
@@ -409,22 +410,24 @@ class Engine:
         return res, error
 
     def __on_log_message(self, msg: str) -> None:
+        log = f"{redcat.style.bold('[' + str(datetime.datetime.utcnow())[:-3] + ']')} " + msg
         with self.__lock_logs:
-            self.__logs.append(msg)
+            self.__logs.append(log)
 
     def __print_logs(self, logs: typing.List[str]) -> None:
         sys.stdout.write("\r\033[K")
         sys.stdout.flush()
         for log in logs:
-            print(log)
+            print(log, end="\n\r")
         sys.stdout.flush()
 
     def __logger(self) -> None:
         while self.__running:
             if self.__lock_logs.acquire(False):
                 if self.__logs:
-                    self.__print(self.__logs)
-                    self.__logs.clear()
+                    if self.__interruptible_section.is_interruptible:
+                        self.__print(self.__logs)
+                        self.__logs.clear()
                 self.__lock_logs.release()
             time.sleep(0.05)
 
@@ -455,7 +458,7 @@ class Engine:
                 if not res:
                     if not error:
                         error = "unspecified error"
-                    print(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
+                    self.__on_log_message(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
             except EOFError:
                 if self.__manager.selected_id:
                     self.__manager.remote_shell()

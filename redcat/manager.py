@@ -129,7 +129,8 @@ class Manager:
                 with self.__lock_listeners:
                     listener_id = str(self.__listeners_last_id)
                     self.__listeners_last_id += 1
-                new_listener = redcat.listener.factory.get_listener(id=listener_id, error_callback=self.on_error, logger_callback=self.__logger_callback, **kwargs)
+                new_listener = redcat.listener.factory.get_listener(id=listener_id, error_callback=self.on_error, 
+                    logger_callback=self.__logger_callback, **kwargs)
             except Exception as err:
                 error = redcat.utils.get_error(err)
                 new_listener = None
@@ -141,7 +142,8 @@ class Manager:
                         with self.__lock_sessions:
                             id = str(self.__sessions_last_id)
                             self.__sessions_last_id += 1
-                        sess = redcat.session.Session(id=id, error_callback=self.on_error, logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
+                        sess = redcat.session.Session(id=id, error_callback=self.on_error, 
+                            logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
                         sess.open()
                         sess.wait_open()
                 except KeyboardInterrupt:
@@ -161,7 +163,10 @@ class Manager:
                         if not self.__selected_session:
                             self.__selected_session = sess
                             self.__selected_id = sess.id
-                        error = ""
+                    error = ""
+                    self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))} " + 
+                        f"session {redcat.style.bold(redcat.style.darkcyan(sess.id))}, " + 
+                        f"connected to {redcat.style.bold(redcat.style.blue(sess.user + '@' + sess.hostname))}, is now ready")
                 else:
                     error = redcat.style.bold(f"session {sess.id} is broken")
                 print()      
@@ -218,6 +223,9 @@ class Manager:
                             self.__selected_session = sess
                             self.__selected_id = sess.id
                     error = ""
+                    self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))} " + 
+                        f"session {redcat.style.bold(redcat.style.darkcyan(sess.id))}, " + 
+                        f"connected to {redcat.style.bold(redcat.style.blue(sess.user + '@' + sess.hostname))}, is now ready")
                 else:
                     error = redcat.style.bold(f"session {sess.id} is broken")
                 print()

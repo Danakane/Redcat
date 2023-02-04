@@ -49,8 +49,6 @@ To pause a session's shell and go back to redcat main console, the user must pre
 
 Finally to terminate a session, the user can call the `kill session` command or `exit` the tool.
 
-Note: The tool starts 1 thread for each session plus a second for the spawned shell.
-
 
 ## Listeners
 

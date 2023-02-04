@@ -238,6 +238,7 @@ class Manager:
                     if id == self.__selected_id:
                         self.__selected_id = ""
                         self.__selected_session = None
+                    self.__logger_callback(f"session {redcat.style.bold(redcat.style.darkcyan(id))} has been removed")
                 else:
                     error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         elif type == "listener":
@@ -247,6 +248,7 @@ class Manager:
                     listen_endpoint.stop()
                     del self.__listeners[id]
                     res = True
+                    self.__logger_callback(f"listener {redcat.style.bold(redcat.style.darkcyan(id))} has been removed")
                 else:
                     error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
         return res, error

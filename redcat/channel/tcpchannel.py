@@ -92,7 +92,8 @@ class TcpChannel(redcat.channel.Channel):
                         data = self._sock.recv(4096)
                         if len(data) == 0:
                             res = False
-                            error = redcat.style.bold(f"Connection with remote {self._remote[0]}:{self._remote[1]} broken")
+                            error = redcat.style.bold(f"Connection with remote {redcat.style.blue(self._remote[0] + ':' + str(self._remote[1]))}") + \
+                                        redcat.style.bold(" broken")
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:

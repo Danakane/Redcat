@@ -1,7 +1,6 @@
 import typing
 import socket
 import signal
-import threading
 import os
 
 import redcat.style
@@ -42,19 +41,15 @@ class MainThreadInterruptibleSection:
     and set the flag to True when entering and to False when exiting a with block
     """
     def __init__(self) -> None:
-        self.__lock: threading.Lock = threading.Lock()
-        self.__is_interruptible_event: threading.Event = threading.Event()
+        self.__is_interruptible: bool = False
         self.__original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
 
     def interrupter(self, func: typing.Callable) -> typing.Callable:
         def decorator(*args, **kwargs) -> None:
-            with self.__lock:
-                if threading.current_thread() != threading.main_thread():
-                    self.__is_interruptible_event.wait()
-                res = func(*args, **kwargs)
-                if threading.current_thread() != threading.main_thread():
-                    os.kill(os.getpid(),signal.SIGUSR1)
-                    self.__is_interruptible_event.clear()
+            res = func(*args, **kwargs)
+            if self.__is_interruptible:
+                os.kill(os.getpid(),signal.SIGUSR1)
+                self.__is_interruptible = False
             return res
         return decorator
 
@@ -66,10 +61,11 @@ class MainThreadInterruptibleSection:
 
     def __enter__(self):
         signal.signal(signal.SIGUSR1, MainThreadInterruptibleSection.on_signal)
-        self.__is_interruptible_event.set()
+        self.__is_interruptible = True
         return self
 
     def __exit__(self, type, value, traceback) -> None:
+        self.__is_interruptible = False
         signal.signal(signal.SIGUSR1, self.__original_sigusr1_handler)
 
     def on_signal(signum, frame):

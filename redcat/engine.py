@@ -7,6 +7,7 @@ import subprocess
 import sys
 import os
 import signal
+import time
 
 import redcat.style
 import redcat.command
@@ -19,10 +20,14 @@ class Engine:
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
+        # logs
+        self.__logs: typing.List[str] = []
+        self.__lock_logs: threading.Lock = threading.Lock()
+        self.__logger_thread: threading.Thread = None
         # main thread interruptible section
         self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection()
         self.__input = self.__interruptible_section.interruptible(self.__input)
-        self.__on_log_message = self.__interruptible_section.interrupter(self.__on_log_message)
+        self.__print = self.__interruptible_section.interrupter(self.__print_logs)
         # sessions manager
         self.__manager: redcat.manager.Manager = redcat.manager.Manager(logger_callback=self.__on_log_message)
         # commands
@@ -403,29 +408,45 @@ class Engine:
                 error = redcat.style.bold(f"{message}: command ") + redcat.style.bold(redcat.style.red(f"{cmd}"))
         return res, error
 
+    def __on_log_message(self, msg: str) -> None:
+        with self.__lock_logs:
+            self.__logs.append(msg)
+
+    def __print_logs(self, logs: typing.List[str]) -> None:
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
+        for log in logs:
+            print(log)
+        sys.stdout.flush()
+
+    def __logger(self) -> None:
+        while self.__running:
+            if self.__lock_logs.acquire(False):
+                if self.__logs:
+                    self.__print(self.__logs)
+                    self.__logs.clear()
+                self.__lock_logs.release()
+            time.sleep(0.05)
+
+    def __input(self, prompt: str) -> str:
+        return input(prompt)
+
     def __get_prompt(self) -> str:
         info = self.__manager.get_session_info()
         if not info:
             info = "None: @local"
-        prompt = redcat.style.bold(redcat.style.yellow(f"[{info}]")) + " " + redcat.style.bold(redcat.style.green(self.__name)) + "🐈 "
+        prompt = f"{redcat.style.bold(redcat.style.yellow('['+ info + ']')) + ' ' + redcat.style.bold(redcat.style.green(self.__name))}🐈 "
         return prompt
-
-    def __on_log_message(self, msg: str) -> None:
-        sys.stdout.write("\r\033[K")
-        sys.stdout.flush()
-        print(msg)
-        sys.stdout.flush()
-
-    def __input(self, prompt: str) -> str:
-        return input(prompt)
 
     def run(self) -> None:
         """
         This is the Engine class main loop
         """
         # start manager
-        self.__manager.start()
         self.__running = True
+        self.__logger_thread = threading.Thread(target=self.__logger)
+        self.__logger_thread.start()
+        self.__manager.start()
         while self.__running:
             try:
                 prompt = self.__get_prompt()
@@ -446,6 +467,7 @@ class Engine:
                 pass
         # stop the manager
         self.__manager.stop()
+        self.__logger_thread.join()
 
     def __enter__(self):
         return self

@@ -46,7 +46,7 @@ class Engine:
             "tcp",
             [
                 redcat.command.argument("host", type=str, nargs=1, help="host to connect"),
-                redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
+                redcat.command.argument("port", type=int, nargs=1, help="port to connect"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform")
             ]
@@ -61,7 +61,7 @@ class Engine:
             "ssl",
             [
                 redcat.command.argument("host", type=str, nargs=1, help="host to connect"),
-                redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
+                redcat.command.argument("port", type=int, nargs=1, help="port to connect"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform"),
                 redcat.command.argument("--cert", type=str, nargs=1, help="path of the certificate of the ssl client"),
@@ -85,7 +85,7 @@ class Engine:
                 redcat.command.argument("-b", "--background", action="store_true", default=False, 
                     help="run the listener in the background to handle multiple connections"),
                 redcat.command.argument("--host", type=str, nargs=1, default="::", help="host to bind"),
-                redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
+                redcat.command.argument("port", type=int, nargs=1, help="port to listen"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform")
             ]
@@ -102,7 +102,7 @@ class Engine:
                 redcat.command.argument("-b", "--background", action="store_true", default=False, 
                     help="run the listener in the background to handle multiple connections"),
                 redcat.command.argument("--host", type=str, nargs=1, default="::", help="host to bind"),
-                redcat.command.argument("port", type=int, nargs=1, help="port to connect to"),
+                redcat.command.argument("port", type=int, nargs=1, help="port to listen"),
                 redcat.command.argument("-m", "--platform", type=str, nargs=1, choices=[redcat.platform.LINUX, redcat.platform.WINDOWS], 
                     default=redcat.platform.LINUX, help="expected platform"),
                 redcat.command.argument("cert", type=str, nargs=1, help="path of the certificate of the ssl listener"),

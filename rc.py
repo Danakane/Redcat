@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(parents=[cli], conflict_handler="resolve")
     if main_args.bind:
         parser.add_argument("--host", type=str, nargs="?", default="::", help="host to bind")
-        parser.add_argument("port", type=int, nargs="?", help="port to bind")
+        parser.add_argument("port", type=int, nargs="?", help="port to listen")
     else:
         parser.add_argument("host", type=str, nargs="?", help="host to connect")
         parser.add_argument("port", type=int, nargs="?", help="port to connect")

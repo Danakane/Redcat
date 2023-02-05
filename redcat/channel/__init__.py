@@ -268,5 +268,7 @@ class GlobalChannelRegister(metaclass=redcat.utils.Singleton):
                 for channel in readables:
                     channel.receive()
             time.sleep(0.01)
+        with self.__lock:
+            self.__thread = None
                     
         

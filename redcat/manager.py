@@ -94,26 +94,24 @@ class Manager:
             self.__sessions_last_id += 1
         sess = redcat.session.Session(id=id, error_callback=self.on_error, logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
         sess.open()
-        while sender.running:
-            if sess.wait_open(0.1):
-                res1 = sess.interactive(True, False) # getting pty immediately, but no raw mode in worker thread to not break the console
-                res2 = sess.interactive(False)
-                res = res1 and res2
-                # we're not on the main thread. 
-                # We must first wait for the session to terminate the shell setup 
-                # before allowing any user interaction from the main thread
-                if res:
-                    with self.__lock_sessions:
-                        self.__sessions[sess.id] = sess
-                        if not self.__selected_session:
-                            self.__selected_session = sess
-                            self.__selected_id = sess.id
-                        res = True
-                        if self.__logger_callback:
-                            self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))} " + 
-                                f"session {redcat.style.bold(redcat.style.darkcyan(sess.id))}, " + 
-                                f"connected to {redcat.style.bold(redcat.style.blue(sess.user + '@' + sess.hostname))}, is now ready")
-                    break
+        if sess.wait_open(15):
+            res1 = sess.interactive(True, False) # getting pty immediately, but no raw mode in worker thread to not break the console
+            res2 = sess.interactive(False)
+            res = res1 and res2
+            # we're not on the main thread. 
+            # We must first wait for the session to terminate the shell setup 
+            # before allowing any user interaction from the main thread
+            if res:
+                with self.__lock_sessions:
+                    self.__sessions[sess.id] = sess
+                    if not self.__selected_session:
+                        self.__selected_session = sess
+                        self.__selected_id = sess.id
+                    res = True
+                    if self.__logger_callback:
+                        self.__logger_callback(f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))} " + 
+                            f"session {redcat.style.bold(redcat.style.darkcyan(sess.id))}, " + 
+                            f"connected to {redcat.style.bold(redcat.style.blue(sess.user + '@' + sess.hostname))}, is now ready")
         if not res:
             sess.close()
 

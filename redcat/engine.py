@@ -28,7 +28,7 @@ class Engine:
         # main thread interruptible section
         self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection()
         self.__input = self.__interruptible_section.interruptible(self.__input)
-        self.__print = self.__interruptible_section.interrupter(self.__print_logs)
+        self.__print_logs = self.__interruptible_section.interrupter(self.__print_logs)
         # sessions manager
         self.__manager: redcat.manager.Manager = redcat.manager.Manager(logger_callback=self.__on_log_message)
         # commands
@@ -426,7 +426,7 @@ class Engine:
             if self.__lock_logs.acquire(False):
                 if self.__logs:
                     if self.__interruptible_section.is_interruptible:
-                        self.__print(self.__logs)
+                        self.__print_logs(self.__logs)
                         self.__logs.clear()
                 self.__lock_logs.release()
             time.sleep(0.05)

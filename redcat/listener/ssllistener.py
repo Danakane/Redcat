@@ -49,9 +49,9 @@ class SslListener(redcat.listener.tcplistener.TcpListener):
                     sock, remote = readable.accept()
                     chan = self.build_channel(remote=remote, sock=sock, protocol=redcat.channel.ChannelProtocol.SSL, ssl_context=self.__ssl_context)
                 except Exception as err:
-                    error = redcat.utils.get_error(err)
-                    if self.__logger_callback:
-                        self.__logger_callback(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
-                    chan = None # TODO: Think about a way to report this error
+                    if self.logger_callback:
+                        error = redcat.utils.get_error(err)
+                        self.logger_callback(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
+                    chan = None
         return chan
 

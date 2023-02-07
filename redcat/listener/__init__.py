@@ -40,6 +40,10 @@ class Listener:
     def running(self) -> bool:
         return not self.__stop_evt.is_set()
 
+    @property
+    def logger_callback(self) -> typing.Callable:
+        return self.__logger_callback
+
     @abstractmethod
     def listen(self) -> redcat.channel.Channel:
         pass

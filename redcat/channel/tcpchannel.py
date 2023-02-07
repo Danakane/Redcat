@@ -105,11 +105,11 @@ class TcpChannel(redcat.channel.Channel):
                     except IOError:
                         res = True # to avoid bad descriptor error
                     except Exception as err:
-                        error = error = redcat.utils.get_error(err)
+                        error = redcat.utils.get_error(err)
                         res = False
             except select.error as err:
                 res = False
-                error =  ": ".join(str(arg) for arg in err.args)
+                error = redcat.utils.get_error(err)
         return res, error, data
 
     def send(self, data: bytes) -> typing.Tuple[bool, str]:

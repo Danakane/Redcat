@@ -78,7 +78,7 @@ class Channel(abc.ABC):
         self.__ready_evt.set() if value else self.__ready_evt.clear()
 
     @property
-    def logger_callback(self) -> None:
+    def logger_callback(self) -> typing.Callable:
         return self.__logger_callback
 
     @property
@@ -141,7 +141,7 @@ class Channel(abc.ABC):
             self.on_error(err)
             self.__error_callback(self, err)
 
-    def receive(self) -> None:
+    def collect(self) -> None:
         with self.__transaction_lock: 
             res, error, data = self.recv()
             if not res:
@@ -266,7 +266,7 @@ class GlobalChannelRegister(metaclass=redcat.utils.Singleton):
                 readables, _, _ = select.select(self.__channels, [], [], 0.01)
             if readables:
                 for channel in readables:
-                    channel.receive()
+                    channel.collect()
             time.sleep(0.01)
         with self.__lock:
             self.__thread = None

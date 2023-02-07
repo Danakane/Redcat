@@ -142,13 +142,17 @@ class Manager:
                             self.__sessions_last_id += 1
                         sess = redcat.session.Session(id=id, error_callback=self.on_error, 
                             logger_callback=self.__logger_callback, chan=chan, platform_name=platform_name)
-                        sess.open()
-                        sess.wait_open()
+                        res, error = sess.open()
+                        if res:
+                            sess.wait_open()
+                        else:
+                            sess.close()
+                            sess = None
                 except KeyboardInterrupt:
                     res = False
                     sess = None
                     error = redcat.style.bold("interrupted by user")
-            if sess:
+            if res:
                 res1 = sess.interactive(True)
                 if res1: 
                     sess.start()
@@ -202,12 +206,16 @@ class Manager:
         if sess:
             try:
                 res, error = sess.open()
-                sess.wait_open()
+                if res:
+                    sess.wait_open()
+                else:
+                    sess.close()
+                    sess = None
             except KeyboardInterrupt:
                 res = False
                 sess = None
                 error = redcat.style.bold("interrupted by user")
-            if sess:
+            if res:
                 res1 = sess.interactive(True)
                 if res1: 
                     sess.start()

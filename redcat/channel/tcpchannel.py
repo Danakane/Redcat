@@ -52,7 +52,9 @@ class TcpChannel(redcat.channel.Channel):
                         self._remote = endpoint
                         res = True
                         error = ""
-                    except socket.error:
+                        break
+                    except socket.error as err:
+                        error = redcat.utils.get_error(err)
                         pass
             except Exception as err:
                 error = redcat.utils.get_error(err)

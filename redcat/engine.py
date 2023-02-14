@@ -141,6 +141,21 @@ class Engine:
             res, error = parent.manager.kill(**kwargs)
             return res, error
         self.__commands[cmd_kill.name] = cmd_kill
+        # upgrade command
+        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a pty using raindrop implant.")
+        @cmd_upgrade.command(
+            [
+                redcat.command.argument("id", type=str, nargs="?", default="", help=("id of session to upgrade. "
+                    "For Windows 10 / Windows Server 2019 (x64) version 1809 (build 10.0.17763) or higher"))
+            ]
+        )
+        def upgrade(parent: Engine, id: str) -> typing.Tuple[bool, str]:
+            """
+            upgrade a session for a given id using raindrop implant. 
+            Limitations: Windows 10 / Windows Server 2019 (x64) version 1809 (build 10.0.17763) or higher
+            """
+            return parent.manager.upgrade(id)
+        self.__commands[cmd_upgrade.name] = cmd_upgrade
         # show command
         cmd_show = redcat.command.Command("show", self, "show available sessions or listeners")
         @cmd_show.command(

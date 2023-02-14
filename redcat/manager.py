@@ -237,7 +237,6 @@ class Manager:
                 print()
         return res, error
 
-    # kill a session or a listener
     def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
@@ -265,6 +264,18 @@ class Manager:
                     self.__logger_callback(f"listener {redcat.style.bold(redcat.style.darkcyan(id))} has been removed")
                 else:
                     error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
+        return res, error
+
+    def upgrade(self, id: str) -> typing.Tuple[bool, str]:
+        res = False 
+        if not id:
+            id = self.__selected_id
+        error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
+        with self.__lock_sessions:
+            if id in self.__sessions.keys():
+                res, error = self.__sessions[id].platform.upgrade()
+                if res:
+                    self.__logger_callback(f"session {redcat.style.bold(redcat.style.darkcyan(id))} has been successfully upgraded")
         return res, error
 
     def select_session(self, id: str) -> typing.Tuple[int, str]:

@@ -25,13 +25,6 @@ class Linux(redcat.platform.Platform):
 
     def __init__(self, chan: redcat.channel.Channel) -> None:
         super().__init__(chan, redcat.platform.LINUX)
-        self.__saved_settings = None
-        self.__got_pty: bool = False
-        self.__interactive: bool = False
-
-    @property
-    def is_interactive(self) -> bool:
-        return self.__interactive
 
     def which(self, name: str, handle_echo: bool=True) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
@@ -156,7 +149,7 @@ class Linux(redcat.platform.Platform):
                     self.disable_history()
                     break
             if got_pty:
-                self.__got_pty = got_pty
+                self._has_pty = got_pty
                 break
         self.channel.wait_data(5)
         time.sleep(0.1)
@@ -166,11 +159,11 @@ class Linux(redcat.platform.Platform):
     @redcat.platform.Platform._with_lock
     def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
         res = False
-        if value != self.__interactive:
+        if value != self._interactive:
             if value:
                 # save the terminal settings going in raw mode
-                if not self.__interactive:
-                    self.__saved_settings = termios.tcgetattr(sys.stdin.fileno())
+                if not self._interactive:
+                    self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
                     if raw:
                         tty.setraw(sys.stdin.fileno())
                 self.disable_history(handle_echo=False)
@@ -186,12 +179,12 @@ class Linux(redcat.platform.Platform):
                     )
                 )
                 self.send_cmd(payload)
-                if self.__got_pty and not self.__interactive:
+                if self._has_pty and not self._interactive:
                     # we already have pty but have been backgrounded
                     # call exit to leave sh shell that we called
                     # when we backgrounded the shell
                     res, _ = self.send_cmd("exit")
-                elif (not self.__got_pty) and self.get_pty():
+                elif (not self._has_pty) and self.get_pty():
                     best_shell = "sh"
                     better_shells = ["zsh", "bash", "ksh", "fish", "dash"]
                     for shell in better_shells:
@@ -212,16 +205,16 @@ class Linux(redcat.platform.Platform):
                     self.channel.purge()
                     res, _ = self.send_cmd("")
                 if res:
-                    self.__interactive = True
+                    self._interactive = True
                 else:
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
             else: 
                 # send ETX (CTRL+C) character to cancel any command that hasn't been entered
                 # before exiting console raw mode
                 res, _ = self.send_cmd("\x03")
                 # restore saved terminal settings
-                if self.__interactive:
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.__saved_settings)
+                if self._interactive:
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
                 if res and self.channel.is_open:
                     # use sh shell when backgrounded
                     # we can't just call exit because user may have called another shell
@@ -231,7 +224,7 @@ class Linux(redcat.platform.Platform):
                     self.channel.wait_data(1)
                     time.sleep(0.2)
                     self.channel.purge()
-                self.__interactive = False
+                self._interactive = False
         else:
             res = True
         return res

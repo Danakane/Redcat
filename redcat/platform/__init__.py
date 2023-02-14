@@ -18,6 +18,9 @@ class Platform(abc.ABC):
         self.__chan: redcat.channel.Channel = chan
         self.__platform_name: str = platform_name.lower()
         self.__lock: threading.Lock = threading.Lock()
+        self._has_pty: bool = False
+        self._saved_settings = None
+        self._interactive: bool = False
 
     @property
     def platform_name(self) -> str:
@@ -28,9 +31,8 @@ class Platform(abc.ABC):
         return self.__chan
 
     @property
-    @abstractmethod
     def is_interactive(self) -> bool:
-        pass
+        return self._interactive
 
     @abstractmethod
     def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
@@ -40,7 +42,10 @@ class Platform(abc.ABC):
         return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
-        return False, False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
+        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
+
+    def upgrade(self) -> typing.Tuple[bool, str]:
+        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
         return False, Dalse, redcat.style.bold(f"not implemented for {self.__platform_name} platform")

@@ -101,7 +101,12 @@ class Windows(redcat.platform.Platform):
                 print()
                 if cmd_success:
                     # decode the temporary file into the final file and delete the temporary file
-                    rfile = "\"" + rfile[1:-1] + "\""
+                    redcat.transaction.Transaction(f"del {rfile}".encode(), self, False).execute()
+                    rfile = rfile.strip("'")
+                    if not rfile.startswith("\""):
+                        rfile = "\"" + rfile
+                    if not rfile.endswith("\""):
+                        rfile += "\""
                     res, cmd_success, data = redcat.transaction.Transaction(f"certutil -decode {tmp_file} {rfile}".encode(), self, True).execute()
                 if res:
                     redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, True).execute()
@@ -157,15 +162,15 @@ class Windows(redcat.platform.Platform):
             if value:
                 self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
                 res, _ = self.send_cmd("exit")
+                res, _ = self.send_cmd("\x03")
                 self.channel.wait_data(1)
-                time.sleep(0.1)
                 self.channel.purge()
-                self.send_cmd("cls")
+                res, _ = self.send_cmd("cls", end="\r")
                 tty.setraw(sys.stdin.fileno())
+                self._raw = True
                 self._interactive = True
             else:
                 res, _ = self.send_cmd("\x03")
-                time.sleep(0.1)
                 if res and self.channel.is_open:
                     # use cmd shell when backgrounded
                     # we can't just call exit because user may have called another shell
@@ -175,15 +180,17 @@ class Windows(redcat.platform.Platform):
                     self.channel.purge()
                     termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
                     self._interactive = False
+                    self._raw = False
         else:
-            self.channel.wait_data(1)
-            time.sleep(0.3)
+            self.channel.wait_data(0.3)
+            time.sleep(0.2)
             self._interactive = value
             self.channel.purge()
             res, _ = self.send_cmd("")
+            self._raw = False
         return res
 
-    def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
-        res, error = self.channel.send(f"{cmd}\r\n".encode())
+    def send_cmd(self, cmd: str, end="\r\n", wait_for: int = 0.1) -> typing.Tuple[bool, str]:
+        res, error = self.channel.send(f"{cmd}{end}".encode())
         time.sleep(wait_for)
         return res, error

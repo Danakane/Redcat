@@ -21,6 +21,7 @@ class Platform(abc.ABC):
         self._has_pty: bool = False
         self._saved_settings = None
         self._interactive: bool = False
+        self._raw: bool = False
 
     @property
     def platform_name(self) -> str:
@@ -33,6 +34,10 @@ class Platform(abc.ABC):
     @property
     def is_interactive(self) -> bool:
         return self._interactive
+
+    @property
+    def is_raw(self) -> bool:
+        return self._raw
 
     @abstractmethod
     def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
@@ -63,8 +68,8 @@ class Platform(abc.ABC):
             res, data = self.__chan.exec_transaction(buffer, start, end, handle_echo, timeout)
         return res, data
 
-    def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
-        res, error = self.channel.send(f"{cmd}\n".encode())
+    def send_cmd(self, cmd: str, end: str = "\n", wait_for: int = 0.1) -> typing.Tuple[bool, str]:
+        res, error = self.channel.send(f"{cmd}{end}".encode())
         time.sleep(wait_for)
         return res, error
 

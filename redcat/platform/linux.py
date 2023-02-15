@@ -166,6 +166,7 @@ class Linux(redcat.platform.Platform):
                     self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
                     if raw:
                         tty.setraw(sys.stdin.fileno())
+                        self._raw = True
                 self.disable_history(handle_echo=False)
                 term = os.environ.get("TERM", "xterm")
                 columns, rows = os.get_terminal_size(0) 
@@ -208,6 +209,7 @@ class Linux(redcat.platform.Platform):
                     self._interactive = True
                 else:
                     termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
+                    self._raw = False
             else: 
                 # send ETX (CTRL+C) character to cancel any command that hasn't been entered
                 # before exiting console raw mode
@@ -215,6 +217,7 @@ class Linux(redcat.platform.Platform):
                 # restore saved terminal settings
                 if self._interactive:
                     termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
+                    self._raw = False
                 if res and self.channel.is_open:
                     # use sh shell when backgrounded
                     # we can't just call exit because user may have called another shell

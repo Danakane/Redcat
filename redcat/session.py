@@ -150,13 +150,20 @@ class Session:
         self.__running = True
         res = False
         error = ""
+        data = b""
         while not self.__stop_evt.is_set():
+            res = False
             byte = sys.stdin.buffer.read(1)
             if (not byte) or (byte == b"\x04"):
                 self.__stop_evt.set()
                 res = True
             else:
-                res, error = self.send(byte)
+                data += byte
+                if data == b"\x1b" or data == b"\x1b[": # 0x1b is the escape sequence we hold it for the next character
+                    res = True
+                else:
+                    res, error = self.send(data)
+                    data = b""
                 if not res:
                     self.__stop_evt.set()
         if (not res) and self.__chan.is_open:

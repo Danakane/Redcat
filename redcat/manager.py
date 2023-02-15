@@ -358,6 +358,11 @@ class Manager:
                 try:
                     with open(lfile, "wb") as f:
                         f.write(data)
+                except IsADirectoryError:
+                    res = False
+                    error = redcat.style.bold("cannot write local file: ") + \
+                                redcat.style.bold(redcat.style.red(f"{lfile}")) + \
+                                redcat.style.bold(" is a directory")
                 except FileNotFoundError:
                     res = False
                     error = redcat.style.bold("cannot write local file ") + \

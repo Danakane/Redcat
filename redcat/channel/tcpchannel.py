@@ -87,7 +87,7 @@ class TcpChannel(redcat.channel.Channel):
             remote = f"{self._remote[0]}:{self._remote[1]}"
             self.logger_callback(f"Connected to remote {redcat.style.bold(redcat.style.blue(remote))}")
 
-    def recv(self) -> typing.Tuple[bool, str, bytes]:
+    def recv(self, size: int = 4096) -> typing.Tuple[bool, str, bytes]:
         res = False
         error = ""
         data = b""
@@ -97,7 +97,7 @@ class TcpChannel(redcat.channel.Channel):
                 readables, _, _= select.select([self._sock], [], [], 0.05)
                 if readables and readables[0] == self._sock:
                     try:
-                        data = self._sock.recv(4096)
+                        data = self._sock.recv(size)
                         if len(data) == 0:
                             res = False
                             error = redcat.style.bold(f"Connection with remote {redcat.style.blue(self._remote[0] + ':' + str(self._remote[1]))}") + \

@@ -100,7 +100,7 @@ class Channel(abc.ABC):
         pass
 
     @abstractmethod
-    def recv(self) -> typing.Tuple[bool, str, bytes]:
+    def recv(self, size: int) -> typing.Tuple[bool, str, bytes]:
         pass
 
     def on_error(self, error: str) -> None:
@@ -180,22 +180,27 @@ class Channel(abc.ABC):
         timed_out = False
         if self.is_open:
             with self.__transaction_lock:
+                self.purge()
                 res, error = self.send(data)
                 rdata = b""
                 resp = b""
                 start_received = False
                 end_received = False
                 if handle_echo:
-                    # purge the command echo
                     start_time = time.time()
-                    while res and (end not in rdata) and (not timed_out):
+                    # The control codes returned due to the console echo can be corrupted
+                    # if the command line is longer than the console dimension
+                    # in that case ansi escape sequence and carriage return / line feed may be inserted
+                    # We use the start code that is less likely to get corrupted because it is at the begining at the line
+                    # However it's not completly full proof: if the pty is really narrow or the prompt is very long
+                    while res and (start not in rdata) and (not timed_out):
                         res, error, resp = self.recv()
                         rdata += resp
                         end_time = time.time()
                         if end_time - start_time > timeout:
                             timed_out = True
                     resp = b""
-                    rdata = redcat.utils.extract_data(rdata, end)
+                    rdata = redcat.utils.extract_data(rdata, start)
                 start_time = time.time()
                 while res and (not start_received) and (not timed_out):
                     res, error, resp = self.recv()
@@ -205,6 +210,7 @@ class Channel(abc.ABC):
                         start_received = True
                     elif end_time - start_time > timeout:
                         timed_out = True
+                rdata = rdata[rdata.find(start):] # remove everything preceding the start code
                 if end in rdata:
                     end_received = True
                 while res and (not end_received) and (not timed_out):

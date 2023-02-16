@@ -32,6 +32,10 @@ class Platform(abc.ABC):
         return self.__chan
 
     @property
+    def has_pty(self) -> bool:
+        return self._has_pty
+
+    @property
     def is_interactive(self) -> bool:
         return self._interactive
 

@@ -31,7 +31,8 @@ class Transaction:
             if self.__platform.has_pty:
                 # This fix is just too broken
                 # Find a better solution later 
-                escape_seq = b"\r\n\x1b[34;197H"
+                escape_seq = redcat.utils.extract_data(data, b"\r\n\x1b[", b"H")
+                escape_seq = b"\r\n\x1b[" + escape_seq + b"H"
                 idx = data.find(escape_seq)
                 start_idx = data[:idx].rfind(b"\x07")
                 data = data[start_idx:]

@@ -9,6 +9,7 @@ import os
 import signal
 import time
 import datetime
+import getpass
 
 import redcat.style
 import redcat.command
@@ -21,6 +22,8 @@ class Engine:
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
+        self.__user: str = getpass.getuser()
+        self.__cwd: str = os.getcwd()
         # logs
         self.__logs: typing.List[str] = []
         self.__lock_logs: threading.Lock = threading.Lock()
@@ -426,11 +429,14 @@ class Engine:
 
     def __on_log_message(self, msg: str) -> None:
         log = f"{redcat.style.bold('[' + str(datetime.datetime.utcnow())[:-3] + ']')} " + msg
-        with self.__lock_logs:
-            self.__logs.append(log)
+        if threading.current_thread() == threading.main_thread():
+            print("\n\r" + log, end="\n\r")
+        else:
+            with self.__lock_logs:
+                self.__logs.append(log)
 
     def __print_logs(self, logs: typing.List[str]) -> None:
-        sys.stdout.write("\r\033[K")
+        sys.stdout.write("\n\r\033[K")
         sys.stdout.flush()
         for log in logs:
             print(log, end="\n\r")
@@ -449,11 +455,35 @@ class Engine:
     def __input(self, prompt: str) -> str:
         return input(prompt)
 
+    def __get_cwd(self, max_length: int = 50) -> None:
+        cwd = self.__cwd
+        if len(self.__cwd) > max_length:
+            directories = self.__cwd.split("/")
+            if len(directories) > 2:
+                cwd = f"/{directories[1]}/.."
+                last_parts = ""
+                for directory in reversed(directories):
+                    if len(cwd) == 0:
+                        cwd = directory
+                    else:
+                        if len(cwd) + len(directory) + len(last_parts) + 1 < max_length:
+                            last_parts = "/" + directory + last_parts
+                        else:
+                            cwd += last_parts
+                            break
+        return cwd
+
     def __get_prompt(self) -> str:
         info = self.__manager.get_session_info()
         if not info:
             info = "None: @local"
-        prompt = f"{redcat.style.bold(redcat.style.yellow('['+ info + ']')) + ' ' + redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+        prompt = (
+            f"{redcat.style.bg_green(redcat.style.bold(' ' + self.__user + ' ' * 4))}"
+            f"{redcat.style.bg_white(redcat.style.bold(redcat.style.blue(' ' + self.__get_cwd() + ' ' * 4)))}" 
+            f"{redcat.style.bg_cyan(redcat.style.bold(redcat.style.yellow(' ' + info + ' ' * 4)))}" 
+            "\n"
+            f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+        )
         return prompt
 
     def run(self) -> None:

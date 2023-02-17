@@ -84,7 +84,7 @@ class Manager:
                             if id in self.__listeners.keys():
                                 self.kill("listener", id)
                     self.__broken_listeners.clear()
-            time.sleep(0.05)
+            time.sleep(0.01)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
         res = False
@@ -325,8 +325,7 @@ class Manager:
         if type == "sessions":
             res = True
             for id, sess in self.__sessions.items():
-                res, error, user = sess.platform.whoami()
-                serializations.append(f"{id},{user},{sess.hostname},{sess.remote},{sess.protocol[1]},{sess.platform_name}")
+                serializations.append(f"{id},{sess.user},{sess.hostname},{sess.remote},{sess.protocol[1]},{sess.platform_name}")
         elif type == "listeners":
             res = True
             for id, listen_point in self.__listeners.items():

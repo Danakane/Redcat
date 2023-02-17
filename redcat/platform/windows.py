@@ -41,6 +41,12 @@ class Windows(redcat.platform.Platform):
             data = b""
         return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 
+    def disable_echo(self) -> typing.Tuple[bool, str]:
+        return self.send_cmd("echo off")
+
+    def enable_echo(self) -> typing.Tuple[bool, str]:
+        return self.send_cmd("echo on")
+
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         cmd_success = False
         error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
@@ -177,7 +183,11 @@ class Windows(redcat.platform.Platform):
                     self._raw = False
         else:
             self.channel.wait_data(0.3)
-            time.sleep(0.2)
+            time.sleep(0.1)
+            if value:
+                self.enable_echo()
+            else:
+                self.disable_echo()
             self._interactive = value
             self.channel.purge()
             res, _ = self.send_cmd("")

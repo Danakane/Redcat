@@ -8,6 +8,16 @@ BLUE = "\001\033[94m\002"
 GREEN = "\001\033[92m\002"
 YELLOW = "\001\033[93m\002"
 RED = "\001\033[91m\002"
+
+BG_BLACK = "\001\u001b[40m\002"
+BG_RED = "\001\u001b[41m\002"
+BG_GREEN = "\001\u001b[42m\002"
+BG_YELLOW = "\001\u001b[43m\002"
+BG_BLUE = "\001\u001b[44m\002"
+BG_MAGENTA = "\001\u001b[45m\002"
+BG_CYAN = "\001\u001b[46m\002"
+BG_WHITE = "\001\u001b[47m\002"
+
 END = "\001\033[0m\002"
 BOLD = "\001\033[1m\002"
 UNDERLINE = "\001\033[4m\002"
@@ -35,6 +45,30 @@ def yellow(string: str) -> str:
 
 def red(string: str) -> str:
     return RED + string + END
+
+def bg_black(string: str) -> str:
+    return BG_BLACK + string + END
+
+def bg_red(string: str) -> str:
+    return BG_RED + string + END
+
+def bg_green(string: str) -> str:
+    return BG_GREEN + string + END
+
+def bg_yellow(string: str) -> str:
+    return BG_YELLOW + string + END
+
+def bg_cyan(string: str) -> str:
+    return BG_CYAN + string + END
+
+def bg_blue(string: str) -> str:
+    return BG_BLUE + string + END
+
+def bg_magenta(string: str) -> str:
+    return BG_MAGENTA + string + END
+
+def bg_white(string: str) -> str:
+    return BG_WHITE + string + END
 
 def bold(string) -> str:
     return BOLD + string + BOLDEND

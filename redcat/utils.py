@@ -45,11 +45,9 @@ class MainThreadInterruptibleSection:
     It takes a setter to flag attribute that indicate if the main thread can be interrupted
     and set the flag to True when entering and to False when exiting a with block
     """
-    def __init__(self, sigwinch_handler: typing.Callable) -> None:
+    def __init__(self) -> None:
         self.__is_interruptible: bool = False
-        self.__sigwinch_handler: typing.Callable = sigwinch_handler
         self.__original_sigusr1_handler = signal.getsignal(signal.SIGUSR1)
-        self.__original_sigwinch_handle = signal.getsignal(signal.SIGWINCH)
 
     @property
     def is_interruptible(self) -> bool:
@@ -71,7 +69,6 @@ class MainThreadInterruptibleSection:
         return decorator
 
     def __enter__(self):
-        signal.signal(signal.SIGWINCH, self.__sigwinch_handler)
         signal.signal(signal.SIGUSR1, MainThreadInterruptibleSection.on_signal)
         self.__is_interruptible = True
         return self
@@ -79,7 +76,6 @@ class MainThreadInterruptibleSection:
     def __exit__(self, type, value, traceback) -> None:
         self.__is_interruptible = False
         signal.signal(signal.SIGUSR1, self.__original_sigusr1_handler)
-        signal.signal(signal.SIGWINCH, self.__original_sigwinch_handle)
 
     def on_signal(signum, frame):
         raise MainThreadInterrupt()

@@ -25,17 +25,14 @@ class Engine(metaclass=redcat.utils.Singleton):
         self.__user: str = getpass.getuser()
         self.__hostname: str = os.uname()[1]
         self.__cwd: str = os.getcwd()
-        self.__current_cursor_position: typing.Tuple[int, int] = (0,0)
         # lock on stdio
         self.__io_lock: threading.RLock = threading.RLock()
-        # signal sigwinch reentrancy lock
-        self.__sigwinch_reentrancy_lock: threading.Lock = threading.Lock()
         # logs
         self.__logs: typing.List[str] = []
         self.__lock_logs: threading.Lock = threading.Lock()
         self.__logger_thread: threading.Thread = None
         # main thread interruptible section
-        self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection(Engine.handle_sigwinch)
+        self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection()
         self.__input = self.__interruptible_section.interruptible(self.__input)
         self.__print_logs = self.__interruptible_section.interrupter(self.__print_logs)
         # sessions manager
@@ -323,18 +320,6 @@ class Engine(metaclass=redcat.utils.Singleton):
     def running(self) -> bool:
         return self.__running
 
-    @property
-    def cursor_current_position(self) -> typing.Tuple[int, int]:
-        return self.__current_cursor_position
-
-    @property
-    def io_lock(self) -> threading.RLock:
-        return self.__io_lock
-
-    @property
-    def sigwinch_reentrancy_lock(self) -> threading.RLock:
-        return self.__sigwinch_reentrancy_lock
-
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
         if state == 0:
@@ -526,12 +511,13 @@ class Engine(metaclass=redcat.utils.Singleton):
         with self.__io_lock:
             status = self.get_status()
             redcat.utils.cursor_save_position()
-            self.__current_cursor_position = redcat.utils.get_cursor_current_position()
-            current_row = self.__current_cursor_position[0]
+            current_row, _ = redcat.utils.get_cursor_current_position()
             bottom = redcat.utils.get_console_bottom_row()
             if bottom - current_row < 1:
                 redcat.utils.reset_line()
-            redcat.utils.cursor_move_to_bottom()
+            for i in range(current_row, bottom):
+                redcat.utils.cursor_move_down()
+                redcat.utils.reset_line()
             if bottom - current_row < 1:
                 redcat.utils.scroll_down()
             redcat.utils.reset_line()
@@ -583,27 +569,3 @@ class Engine(metaclass=redcat.utils.Singleton):
     def __exit__(self, type, value, traceback):
         self.__manager.clear()
 
-    def handle_sigwinch(signum, frame):
-        """
-        handle the status bar when the console resize 
-        """
-        engine = Engine()
-        if engine.io_lock.acquire(False):
-            try:
-                if engine.sigwinch_reentrancy_lock.acquire(False):
-                    try:
-                        status = engine.get_status()
-                        redcat.utils.cursor_save_position()
-                        current_row, current_col = engine.cursor_current_position
-                        redcat.utils.cursor_move_to_line_start()
-                        bottom = redcat.utils.get_console_bottom_row()
-                        for i in range(current_row, bottom):
-                            redcat.utils.cursor_move_down()
-                            redcat.utils.reset_line()
-                        if bottom - current_row > 1:
-                            print(f"{status}", end="", flush=True)
-                        redcat.utils.cursor_back_save_point()
-                    finally:
-                        engine.sigwinch_reentrancy_lock.release()
-            finally:
-                engine.io_lock.release()

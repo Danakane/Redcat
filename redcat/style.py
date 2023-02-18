@@ -88,30 +88,7 @@ def remove_all_occurrences(string: str, start: str, end: str) -> str:
             if end_idx != -1:
                 res = res[:start_idx] + res[end_idx + len(end):]
     return res
-"""
-def tabulate(headers: typing.List[str], data: typing.List[typing.List[str]]) -> str:
-    columns_size = []
-    columns_clean_size = []
-    table = [[bold(header) for header in headers]] + data
-    if table:
-        for j in range(len(table[0])):
-            column = [row[j] for row in table if row]
-            columns_size.append(len(max(column, key=len)) + 5)
-            columns_clean_size
-    row_format = ""
-    for column_size in columns_size:
-        row_format += ("{" + f":<{column_size}" + "}")
-    limits = []
-    str_rows = []
-    for row in table:
-        if row:
-            str_row = " " * 4 + row_format.format(*row)
-            str_rows.append(str_row)
-    max_row_length = len(max([remove_all_occurrences(str_row, "\001", "\002") for str_row in str_rows], key=len)) - 2
-    str_rows = [str_rows[0], " " * 2 + "─" * max_row_length] + str_rows[1:]
-    str_table = "\n".join(str_rows)
-    return str_table
-"""
+
 def tabulate(headers: typing.List[str], rows: typing.List[typing.List[str]]) -> str:
     # Determine column widths
     all_rows = [headers] + rows

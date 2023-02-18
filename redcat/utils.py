@@ -3,10 +3,6 @@ import socket
 import signal
 import threading
 import os
-import sys
-import termios
-import shutil
-import sys
 
 import redcat.style
 

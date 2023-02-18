@@ -9,7 +9,6 @@ import os
 import signal
 import time
 import datetime
-import getpass
 
 import redcat.style
 import redcat.command
@@ -22,9 +21,6 @@ class Engine(metaclass=redcat.utils.Singleton):
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
-        self.__user: str = getpass.getuser()
-        self.__hostname: str = os.uname()[1]
-        self.__cwd: str = os.getcwd()
         # lock on stdio
         self.__io_lock: threading.RLock = threading.RLock()
         # logs
@@ -442,7 +438,7 @@ class Engine(metaclass=redcat.utils.Singleton):
                 self.__logs.append(log)
 
     def __print_logs(self, logs: typing.List[str]) -> None:
-        sys.stdout.write("\n\r\033[K")
+        sys.stdout.write("\r\033[K")
         sys.stdout.flush()
         for log in logs:
             print(log, end="\n\r")
@@ -461,72 +457,16 @@ class Engine(metaclass=redcat.utils.Singleton):
     def __input(self, prompt: str) -> str:
         return input(prompt)
 
-    def get_cwd(self, max_length: int = 50) -> None:
-        cwd = self.__cwd
-        if len(self.__cwd) > max_length:
-            directories = self.__cwd.split("/")
-            if len(directories) > 2:
-                cwd = f"/{directories[1]}/…"
-                last_parts = ""
-                for directory in reversed(directories):
-                    if len(cwd) == 0:
-                        cwd = directory
-                    else:
-                        if len(cwd) + len(directory) + len(last_parts) + 1 < max_length:
-                            last_parts = "/" + directory + last_parts
-                        else:
-                            cwd += last_parts
-                            break
-        return cwd
-
-    def get_status(self) -> str:
+    def __get_prompt(self) -> str:
         info = self.__manager.get_session_info()
-        session_bg_color = redcat.style.bg_yellow
-        session_color = redcat.style.red
         if not info:
             info = "None: @local"
-            session_bg_color = redcat.style.bg_cyan
-            session_color = redcat.style.yellow
-        status = (
-            f"{redcat.style.bg_green(redcat.style.bold(' ' + self.__user + '@' + self.__hostname + ' '))}"
-            f"{redcat.style.bg_white(redcat.style.bold(redcat.style.blue(' ' + self.get_cwd() + ' ')))}" 
-            f"{session_bg_color(redcat.style.bold(session_color(' ' + info + ' ')))}" 
+        prompt = (
+            f"{redcat.style.bold(redcat.style.yellow('[' + info + ']'))}"
+            " "
+            f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
         )
-        return status
-
-    def get_prompt_size(self) -> int:
-        return len(self.__name) + 2
-
-    def __get_prompt(self) -> str:
-        return f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
-
-    def __remove_status(self) -> None:
-        with self.__io_lock:
-            redcat.utils.cursor_save_position()
-            redcat.utils.cursor_move_to_bottom()
-            redcat.utils.reset_line()
-            redcat.utils.cursor_back_save_point()
-
-    def __display_status(self) -> None:
-        with self.__io_lock:
-            status = self.get_status()
-            redcat.utils.cursor_save_position()
-            current_row, _ = redcat.utils.get_cursor_current_position()
-            bottom = redcat.utils.get_console_bottom_row()
-            if bottom - current_row < 1:
-                redcat.utils.reset_line()
-            for i in range(current_row, bottom):
-                redcat.utils.cursor_move_down()
-                redcat.utils.reset_line()
-            if bottom - current_row < 1:
-                redcat.utils.scroll_down()
-            redcat.utils.reset_line()
-            print(f"{status}", end="", flush=True)
-            if bottom - current_row < 1:
-                redcat.utils.cursor_move_up()
-                redcat.utils.cursor_move_to_line_start()
-            else:
-                redcat.utils.cursor_back_save_point()
+        return prompt
 
     def run(self) -> None:
         """
@@ -539,10 +479,8 @@ class Engine(metaclass=redcat.utils.Singleton):
         self.__manager.start()
         while self.__running:
             try:
-                self.__display_status()
                 prompt = self.__get_prompt()
                 cmd = self.__input(prompt)
-                self.__remove_status()
                 with self.__io_lock:
                     res, error = self.__call(cmd)
                 if not res:
@@ -568,4 +506,3 @@ class Engine(metaclass=redcat.utils.Singleton):
 
     def __exit__(self, type, value, traceback):
         self.__manager.clear()
-

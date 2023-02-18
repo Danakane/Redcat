@@ -28,6 +28,8 @@ class Engine(metaclass=redcat.utils.Singleton):
         self.__current_cursor_position: typing.Tuple[int, int] = (0,0)
         # lock on stdio
         self.__io_lock: threading.RLock = threading.RLock()
+        # signal sigwinch reentrancy lock
+        self.__sigwinch_reentrancy_lock: threading.Lock = threading.Lock()
         # logs
         self.__logs: typing.List[str] = []
         self.__lock_logs: threading.Lock = threading.Lock()
@@ -329,6 +331,10 @@ class Engine(metaclass=redcat.utils.Singleton):
     def io_lock(self) -> threading.RLock:
         return self.__io_lock
 
+    @property
+    def sigwinch_reentrancy_lock(self) -> threading.RLock:
+        return self.__sigwinch_reentrancy_lock
+
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
         if state == 0:
@@ -584,15 +590,20 @@ class Engine(metaclass=redcat.utils.Singleton):
         engine = Engine()
         if engine.io_lock.acquire(False):
             try:
-                status = engine.get_status()
-                redcat.utils.cursor_save_position()
-                current_row, current_col = engine.cursor_current_position
-                bottom = redcat.utils.get_console_bottom_row()
-                for i in range(current_row, bottom):
-                    redcat.utils.cursor_move_down()
-                    redcat.utils.reset_line()
-                if bottom - current_row > 1:
-                    print(f"{status}", end="", flush=True)
-                redcat.utils.cursor_back_save_point()
+                if engine.sigwinch_reentrancy_lock.acquire(False):
+                    try:
+                        status = engine.get_status()
+                        redcat.utils.cursor_save_position()
+                        current_row, current_col = engine.cursor_current_position
+                        redcat.utils.cursor_move_to_line_start()
+                        bottom = redcat.utils.get_console_bottom_row()
+                        for i in range(current_row, bottom):
+                            redcat.utils.cursor_move_down()
+                            redcat.utils.reset_line()
+                        if bottom - current_row > 1:
+                            print(f"{status}", end="", flush=True)
+                        redcat.utils.cursor_back_save_point()
+                    finally:
+                        engine.sigwinch_reentrancy_lock.release()
             finally:
                 engine.io_lock.release()

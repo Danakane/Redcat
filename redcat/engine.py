@@ -17,19 +17,23 @@ import redcat.platform
 import redcat.manager
 
 
-class Engine:
+class Engine(metaclass=redcat.utils.Singleton):
 
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
         self.__user: str = getpass.getuser()
+        self.__hostname: str = os.uname()[1]
         self.__cwd: str = os.getcwd()
+        self.__current_cursor_position: typing.Tuple[int, int] = (0,0)
+        # lock on stdio
+        self.__io_lock: threading.RLock = threading.RLock()
         # logs
         self.__logs: typing.List[str] = []
         self.__lock_logs: threading.Lock = threading.Lock()
         self.__logger_thread: threading.Thread = None
         # main thread interruptible section
-        self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection()
+        self.__interruptible_section: redcat.utils.MainThreadInterruptibleSection = redcat.utils.MainThreadInterruptibleSection(Engine.handle_sigwinch)
         self.__input = self.__interruptible_section.interruptible(self.__input)
         self.__print_logs = self.__interruptible_section.interrupter(self.__print_logs)
         # sessions manager
@@ -178,11 +182,13 @@ class Engine:
                     if row:
                         data.append(row.split(","))
                 if type == "sessions":
-                    headers = ["ID", "User", "Remote host", "End point", "Protocol", "Platform"]
+                    headers = [redcat.style.bold("ID"), redcat.style.bold("User"), redcat.style.bold("Remote host"), 
+                        redcat.style.bold("End point"), redcat.style.bold("Protocol"), redcat.style.bold("Platform")]
                     print("\n" + redcat.style.tabulate(headers, data) + "\n")
                     res = True
                 elif type == "listeners":
-                    headers = ["ID", "End point", "Protocol", "Expected platform"]
+                    headers = [redcat.style.bold("ID"), redcat.style.bold("End point"), 
+                        redcat.style.bold("Protocol"), redcat.style.bold("Expected platform")]
                     print("\n" + redcat.style.tabulate(headers, data) + "\n")
                     res = True
             return res, error
@@ -285,17 +291,17 @@ class Engine:
         )
         def help(self, name: str = "") -> typing.Tuple[bool, str]:
             res = False
-            error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.red(f"{name}"))
+            error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.blue(f"{name}"))
             if name:
                 if name in self.__commands.keys():
                     self.__commands[name].parser.print_help()
                     res = True
                     error = ""
             else:
-                headers = ["Command", "Description"]
+                headers = [redcat.style.bold("Command"), redcat.style.bold("Description")]
                 data = []
                 for cmd in self.__commands.values():
-                    data.append([cmd.name, cmd.description])
+                    data.append([redcat.style.bold(redcat.style.green(cmd.name)), redcat.style.bold(redcat.style.yellow(cmd.description))])
                 print("\n" + redcat.style.tabulate(headers, data)+ "\n")
                 res = True
                 error = ""
@@ -314,6 +320,14 @@ class Engine:
     @property
     def running(self) -> bool:
         return self.__running
+
+    @property
+    def cursor_current_position(self) -> typing.Tuple[int, int]:
+        return self.__current_cursor_position
+
+    @property
+    def io_lock(self) -> threading.RLock:
+        return self.__io_lock
 
     def __autocomplete(self, text: str, state: int) -> str:
         res = None
@@ -430,7 +444,8 @@ class Engine:
     def __on_log_message(self, msg: str) -> None:
         log = f"{redcat.style.bold('[' + str(datetime.datetime.utcnow())[:-3] + ']')} " + msg
         if threading.current_thread() == threading.main_thread():
-            print("\n\r" + log, end="\n\r")
+            with self.__io_lock:
+                print("\r" + log, end="\n\r")
         else:
             with self.__lock_logs:
                 self.__logs.append(log)
@@ -455,12 +470,12 @@ class Engine:
     def __input(self, prompt: str) -> str:
         return input(prompt)
 
-    def __get_cwd(self, max_length: int = 50) -> None:
+    def get_cwd(self, max_length: int = 50) -> None:
         cwd = self.__cwd
         if len(self.__cwd) > max_length:
             directories = self.__cwd.split("/")
             if len(directories) > 2:
-                cwd = f"/{directories[1]}/.."
+                cwd = f"/{directories[1]}/…"
                 last_parts = ""
                 for directory in reversed(directories):
                     if len(cwd) == 0:
@@ -473,18 +488,53 @@ class Engine:
                             break
         return cwd
 
-    def __get_prompt(self) -> str:
+    def get_status(self) -> str:
         info = self.__manager.get_session_info()
+        session_bg_color = redcat.style.bg_yellow
+        session_color = redcat.style.red
         if not info:
             info = "None: @local"
-        prompt = (
-            f"{redcat.style.bg_green(redcat.style.bold(' ' + self.__user + ' ' * 4))}"
-            f"{redcat.style.bg_white(redcat.style.bold(redcat.style.blue(' ' + self.__get_cwd() + ' ' * 4)))}" 
-            f"{redcat.style.bg_cyan(redcat.style.bold(redcat.style.yellow(' ' + info + ' ' * 4)))}" 
-            "\n"
-            f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+            session_bg_color = redcat.style.bg_cyan
+            session_color = redcat.style.yellow
+        status = (
+            f"{redcat.style.bg_green(redcat.style.bold(' ' + self.__user + '@' + self.__hostname + ' '))}"
+            f"{redcat.style.bg_white(redcat.style.bold(redcat.style.blue(' ' + self.get_cwd() + ' ')))}" 
+            f"{session_bg_color(redcat.style.bold(session_color(' ' + info + ' ')))}" 
         )
-        return prompt
+        return status
+
+    def get_prompt_size(self) -> int:
+        return len(self.__name) + 2
+
+    def __get_prompt(self) -> str:
+        return f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+
+    def __remove_status(self) -> None:
+        with self.__io_lock:
+            redcat.utils.cursor_save_position()
+            redcat.utils.cursor_move_to_bottom()
+            redcat.utils.reset_line()
+            redcat.utils.cursor_back_save_point()
+
+    def __display_status(self) -> None:
+        with self.__io_lock:
+            status = self.get_status()
+            redcat.utils.cursor_save_position()
+            self.__current_cursor_position = redcat.utils.get_cursor_current_position()
+            current_row = self.__current_cursor_position[0]
+            bottom = redcat.utils.get_console_bottom_row()
+            if bottom - current_row < 1:
+                redcat.utils.reset_line()
+            redcat.utils.cursor_move_to_bottom()
+            if bottom - current_row < 1:
+                redcat.utils.scroll_down()
+            redcat.utils.reset_line()
+            print(f"{status}", end="", flush=True)
+            if bottom - current_row < 1:
+                redcat.utils.cursor_move_up()
+                redcat.utils.cursor_move_to_line_start()
+            else:
+                redcat.utils.cursor_back_save_point()
 
     def run(self) -> None:
         """
@@ -497,16 +547,20 @@ class Engine:
         self.__manager.start()
         while self.__running:
             try:
+                self.__display_status()
                 prompt = self.__get_prompt()
                 cmd = self.__input(prompt)
-                res, error = self.__call(cmd)
+                self.__remove_status()
+                with self.__io_lock:
+                    res, error = self.__call(cmd)
                 if not res:
                     if not error:
                         error = "unspecified error"
                     self.__on_log_message(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
             except EOFError:
                 if self.__manager.selected_id:
-                    self.__manager.remote_shell()
+                    with self.__io_lock:
+                        self.__manager.remote_shell()
                 else:
                     print()
             except KeyboardInterrupt:
@@ -523,3 +577,22 @@ class Engine:
     def __exit__(self, type, value, traceback):
         self.__manager.clear()
 
+    def handle_sigwinch(signum, frame):
+        """
+        handle the status bar when the console resize 
+        """
+        engine = Engine()
+        if engine.io_lock.acquire(False):
+            try:
+                status = engine.get_status()
+                redcat.utils.cursor_save_position()
+                current_row, current_col = engine.cursor_current_position
+                bottom = redcat.utils.get_console_bottom_row()
+                for i in range(current_row, bottom):
+                    redcat.utils.cursor_move_down()
+                    redcat.utils.reset_line()
+                if bottom - current_row > 1:
+                    print(f"{status}", end="", flush=True)
+                redcat.utils.cursor_back_save_point()
+            finally:
+                engine.io_lock.release()

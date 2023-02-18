@@ -34,17 +34,18 @@ class Transaction:
                 escape_seq = redcat.utils.extract_data(data, b"\r\n\x1b[", b"H")
                 escape_seq = b"\r\n\x1b[" + escape_seq + b"H"
                 idx = data.find(escape_seq)
-                start_idx = data[:idx].rfind(b"\x07")
-                data = data[start_idx:]
-                data = redcat.utils.extract_data(data, b"\x07", b"\r\x1b]0;")
-                filtered_data = bytearray()
-                i = 0
-                while i < len(data):
-                    if data[i:i+len(escape_seq)] == escape_seq:
-                        i += len(escape_seq) + 1
-                    else:
-                        filtered_data.append(data[i])
-                        i += 1
-                data = bytes(filtered_data)
+                if idx > -1:
+                    start_idx = data[:idx].rfind(b"\x07")
+                    data = data[start_idx:]
+                    data = redcat.utils.extract_data(data, b"\x07", b"\r\x1b]0;")
+                    filtered_data = bytearray()
+                    i = 0
+                    while i < len(data):
+                        if data[i:i+len(escape_seq)] == escape_seq:
+                            i += len(escape_seq) + 1
+                        else:
+                            filtered_data.append(data[i])
+                            i += 1
+                    data = bytes(filtered_data)
         return res, cmd_success, data
 

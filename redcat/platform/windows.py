@@ -160,8 +160,9 @@ class Windows(redcat.platform.Platform):
         if self._has_pty:
             if value:
                 self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
-                res, _ = self.send_cmd("exit")
-                res, _ = self.send_cmd("\x03")
+                self.send_cmd("exit")
+                self.send_cmd("\x03")
+                self.enable_echo()
                 self.channel.wait_data(1)
                 self.channel.purge()
                 res, _ = self.send_cmd("cls", end="\r")
@@ -175,6 +176,7 @@ class Windows(redcat.platform.Platform):
                     # we can't just call exit because user may have called another shell
                     res, _ = self.send_cmd("cmd")
                     res, _ = self.send_cmd("set PROMPT= ")
+                    self.disable_echo()
                     self.channel.wait_data(1)
                     time.sleep(0.1)
                     self.channel.purge()

@@ -325,11 +325,25 @@ class Manager:
         if type == "sessions":
             res = True
             for id, sess in self.__sessions.items():
-                serializations.append(f"{id},{sess.user},{sess.hostname},{sess.remote},{sess.protocol[1]},{sess.platform_name}")
+                serializations.append((
+                    f"{redcat.style.bold(redcat.style.cyan(id))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.user))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.hostname))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.remote))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))},"
+                    f"{redcat.style.bold(redcat.style.yellow(sess.platform_name))}"
+                    )
+                )
         elif type == "listeners":
             res = True
             for id, listen_point in self.__listeners.items():
-                serializations.append(f"{id},{listen_point.endpoint},{listen_point.protocol[1]},{listen_point.platform_name}")
+                serializations.append((
+                    f"{redcat.style.bold(redcat.style.darkcyan(id))},"
+                    f"{redcat.style.bold(redcat.style.blue(listen_point.endpoint))},"
+                    f"{redcat.style.bold(redcat.style.blue(listen_point.protocol[1]))},"
+                    f"{redcat.style.bold(redcat.style.yellow(listen_point.platform_name))}"
+                    )
+                )
         return res, error, "\n".join(serializations)
 
     def get_session_info(self, id: str = "") -> str:

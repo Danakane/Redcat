@@ -1,4 +1,5 @@
 import typing
+import re
 
 
 PURPLE = "\001\033[95m\002"
@@ -76,13 +77,27 @@ def bold(string) -> str:
 def underline(string) -> str:
     return UNDERLINE + string + UNDERLINEEND
 
+def remove_all_occurrences(string: str, start: str, end: str) -> str:
+    res = string
+    start_idx = 0
+    end_idx = 0
+    while start_idx != -1 and end_idx != -1:
+        start_idx = res.find(start)
+        if start_idx != -1:
+            end_idx = res.find(end, start_idx + len(start))
+            if end_idx != -1:
+                res = res[:start_idx] + res[end_idx + len(end):]
+    return res
+"""
 def tabulate(headers: typing.List[str], data: typing.List[typing.List[str]]) -> str:
     columns_size = []
-    table = [headers] + data
+    columns_clean_size = []
+    table = [[bold(header) for header in headers]] + data
     if table:
         for j in range(len(table[0])):
             column = [row[j] for row in table if row]
             columns_size.append(len(max(column, key=len)) + 5)
+            columns_clean_size
     row_format = ""
     for column_size in columns_size:
         row_format += ("{" + f":<{column_size}" + "}")
@@ -92,10 +107,39 @@ def tabulate(headers: typing.List[str], data: typing.List[typing.List[str]]) -> 
         if row:
             str_row = " " * 4 + row_format.format(*row)
             str_rows.append(str_row)
-    max_row_length = len(max(str_rows, key=len)) - 2
+    max_row_length = len(max([remove_all_occurrences(str_row, "\001", "\002") for str_row in str_rows], key=len)) - 2
     str_rows = [str_rows[0], " " * 2 + "─" * max_row_length] + str_rows[1:]
     str_table = "\n".join(str_rows)
     return str_table
+"""
+def tabulate(headers: typing.List[str], rows: typing.List[typing.List[str]]) -> str:
+    # Determine column widths
+    all_rows = [headers] + rows
+    regex_filter = "\033\[[\d;]+m|[\x01\x02]"
+    col_widths = [max(len(re.sub(regex_filter, "", str(row[i]))) for row in all_rows) for i in range(len(headers))]
+    col_widths = [max(width, len(re.sub(regex_filter, "", str(header)))) for width, header in zip(col_widths, headers)]
+    # Build table
+    data_rows = []
+    for row in rows:
+        row_data = []
+        for i, cell in enumerate(row):
+            cell_width = len(re.sub(regex_filter, "", str(cell)))
+            padding = col_widths[i] - cell_width
+            row_data.append(f"{cell}{' ' * padding}")
+        data_rows.append(" " * 4 + (4 * " ").join(row_data))
+    header_row = []
+    for i, cell in enumerate(headers):
+        cell_width = len(re.sub(regex_filter, "", str(cell)))
+        padding = col_widths[i] - cell_width
+        header_row.append(f"{cell}{' ' * padding}")
+    header_row = " " * 4 + (4 * " ").join(header_row)
+    separator_row = [f"{'─' * (col_widths[i] + 4)}" for i, _ in enumerate(headers)]
+    separator_row = 4* " " + "".join(separator_row)
+    # Combine headers and data rows
+    all_rows = [header_row] + [separator_row] + data_rows
+    # Join all rows into table
+    table = "\n".join(all_rows)
+    return table
 
 # https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters?noredirect=1&lq=1
 def print_progress_bar (iteration, total, prefix = "", suffix = "", decimals = 1, length = 100, fill = "█", print_end = "\r"):

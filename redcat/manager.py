@@ -84,7 +84,7 @@ class Manager:
                             if id in self.__listeners.keys():
                                 self.kill("listener", id)
                     self.__broken_listeners.clear()
-            time.sleep(0.05)
+            time.sleep(0.01)
 
     def __on_new_channel(self, sender: redcat.listener.Listener, chan: redcat.channel.Channel, platform_name: str) -> None:
         res = False
@@ -237,7 +237,6 @@ class Manager:
                 print()
         return res, error
 
-    # kill a session or a listener
     def kill(self, type: str, id: str) -> typing.Tuple[bool, str]:
         res = False
         error = redcat.style.bold("invalid parameter ") + redcat.style.bold(redcat.style.red(f"{type}"))
@@ -265,6 +264,18 @@ class Manager:
                     self.__logger_callback(f"listener {redcat.style.bold(redcat.style.darkcyan(id))} has been removed")
                 else:
                     error = redcat.style.bold("unknown listener id ") + redcat.style.bold(redcat.style.red(f"{id}"))
+        return res, error
+
+    def upgrade(self, id: str) -> typing.Tuple[bool, str]:
+        res = False 
+        if not id:
+            id = self.__selected_id
+        error = redcat.style.bold("unknown session id ") + redcat.style.bold(redcat.style.red(f"{id}"))
+        with self.__lock_sessions:
+            if id in self.__sessions.keys():
+                res, error = self.__sessions[id].platform.upgrade()
+                if res:
+                    self.__logger_callback(f"session {redcat.style.bold(redcat.style.darkcyan(id))} has been successfully upgraded")
         return res, error
 
     def select_session(self, id: str) -> typing.Tuple[int, str]:
@@ -314,12 +325,25 @@ class Manager:
         if type == "sessions":
             res = True
             for id, sess in self.__sessions.items():
-                res, error, user = sess.platform.whoami()
-                serializations.append(f"{id},{user},{sess.hostname},{sess.remote},{sess.protocol[1]},{sess.platform_name}")
+                serializations.append((
+                    f"{redcat.style.bold(redcat.style.cyan(id))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.user))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.hostname))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.remote))},"
+                    f"{redcat.style.bold(redcat.style.blue(sess.protocol[1]))},"
+                    f"{redcat.style.bold(redcat.style.yellow(sess.platform_name))}"
+                    )
+                )
         elif type == "listeners":
             res = True
             for id, listen_point in self.__listeners.items():
-                serializations.append(f"{id},{listen_point.endpoint},{listen_point.protocol[1]},{listen_point.platform_name}")
+                serializations.append((
+                    f"{redcat.style.bold(redcat.style.darkcyan(id))},"
+                    f"{redcat.style.bold(redcat.style.blue(listen_point.endpoint))},"
+                    f"{redcat.style.bold(redcat.style.blue(listen_point.protocol[1]))},"
+                    f"{redcat.style.bold(redcat.style.yellow(listen_point.platform_name))}"
+                    )
+                )
         return res, error, "\n".join(serializations)
 
     def get_session_info(self, id: str = "") -> str:
@@ -347,6 +371,11 @@ class Manager:
                 try:
                     with open(lfile, "wb") as f:
                         f.write(data)
+                except IsADirectoryError:
+                    res = False
+                    error = redcat.style.bold("cannot write local file: ") + \
+                                redcat.style.bold(redcat.style.red(f"{lfile}")) + \
+                                redcat.style.bold(" is a directory")
                 except FileNotFoundError:
                     res = False
                     error = redcat.style.bold("cannot write local file ") + \

@@ -18,6 +18,10 @@ class Platform(abc.ABC):
         self.__chan: redcat.channel.Channel = chan
         self.__platform_name: str = platform_name.lower()
         self.__lock: threading.Lock = threading.Lock()
+        self._has_pty: bool = False
+        self._saved_settings = None
+        self._interactive: bool = False
+        self._raw: bool = False
 
     @property
     def platform_name(self) -> str:
@@ -28,9 +32,16 @@ class Platform(abc.ABC):
         return self.__chan
 
     @property
-    @abstractmethod
+    def has_pty(self) -> bool:
+        return self._has_pty
+
+    @property
     def is_interactive(self) -> bool:
-        pass
+        return self._interactive
+
+    @property
+    def is_raw(self) -> bool:
+        return self._raw
 
     @abstractmethod
     def interactive(self, value: bool, session_id: str = None, raw: bool = True) -> bool:
@@ -40,7 +51,10 @@ class Platform(abc.ABC):
         return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def upload(self, rfile: str, data: bytes) -> typing.Tuple[bool, str]:
-        return False, False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
+        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
+
+    def upgrade(self) -> typing.Tuple[bool, str]:
+        return False, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
 
     def whoami(self) -> typing.Tuple[bool, str, str]:
         return False, Dalse, redcat.style.bold(f"not implemented for {self.__platform_name} platform")
@@ -58,8 +72,8 @@ class Platform(abc.ABC):
             res, data = self.__chan.exec_transaction(buffer, start, end, handle_echo, timeout)
         return res, data
 
-    def send_cmd(self, cmd: str, wait_for: int = 0.1) -> typing.Tuple[bool, str]:
-        res, error = self.channel.send(f"{cmd}\n".encode())
+    def send_cmd(self, cmd: str, end: str = "\n", wait_for: int = 0.1) -> typing.Tuple[bool, str]:
+        res, error = self.channel.send(f"{cmd}{end}".encode())
         time.sleep(wait_for)
         return res, error
 

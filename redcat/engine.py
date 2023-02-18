@@ -16,11 +16,13 @@ import redcat.platform
 import redcat.manager
 
 
-class Engine:
+class Engine(metaclass=redcat.utils.Singleton):
 
     def __init__(self, name: str) -> None:
         self.__name: str = name
         self.__running: bool = False
+        # lock on stdio
+        self.__io_lock: threading.RLock = threading.RLock()
         # logs
         self.__logs: typing.List[str] = []
         self.__lock_logs: threading.Lock = threading.Lock()
@@ -141,6 +143,19 @@ class Engine:
             res, error = parent.manager.kill(**kwargs)
             return res, error
         self.__commands[cmd_kill.name] = cmd_kill
+        # upgrade command
+        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a C2 implant (reserved for future use)")
+        @cmd_upgrade.command(
+            [
+                redcat.command.argument("id", type=str, nargs="?", default="", help="id of session to upgrade")
+            ]
+        )
+        def upgrade(parent: Engine, id: str) -> typing.Tuple[bool, str]:
+            """
+            upgrade a session for a given id with a C2 implants
+            """
+            return parent.manager.upgrade(id)
+        self.__commands[cmd_upgrade.name] = cmd_upgrade
         # show command
         cmd_show = redcat.command.Command("show", self, "show available sessions or listeners")
         @cmd_show.command(
@@ -160,11 +175,13 @@ class Engine:
                     if row:
                         data.append(row.split(","))
                 if type == "sessions":
-                    headers = ["ID", "User", "Remote host", "End point", "Protocol", "Platform"]
+                    headers = [redcat.style.bold("ID"), redcat.style.bold("User"), redcat.style.bold("Remote host"), 
+                        redcat.style.bold("End point"), redcat.style.bold("Protocol"), redcat.style.bold("Platform")]
                     print("\n" + redcat.style.tabulate(headers, data) + "\n")
                     res = True
                 elif type == "listeners":
-                    headers = ["ID", "End point", "Protocol", "Expected platform"]
+                    headers = [redcat.style.bold("ID"), redcat.style.bold("End point"), 
+                        redcat.style.bold("Protocol"), redcat.style.bold("Expected platform")]
                     print("\n" + redcat.style.tabulate(headers, data) + "\n")
                     res = True
             return res, error
@@ -184,7 +201,7 @@ class Engine:
             return res, error
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
-        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
+        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id")
         @cmd_shell.command(
             [
                 redcat.command.argument("id", type=str, nargs="?", help="id of session to spawn"),
@@ -217,7 +234,7 @@ class Engine:
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
         cmd_upload = redcat.command.Command("upload", self, 
-            "upload a file to the remote host of a given session (slow: not recommended for files bigger than a few mb)",
+            "upload a file to the remote host of a given session",
             self.__on_upload_command_completion)
         @cmd_upload.command(
             [
@@ -267,17 +284,17 @@ class Engine:
         )
         def help(self, name: str = "") -> typing.Tuple[bool, str]:
             res = False
-            error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.red(f"{name}"))
+            error = redcat.style.bold(f"unknown command ") + redcat.style.bold(redcat.style.blue(f"{name}"))
             if name:
                 if name in self.__commands.keys():
                     self.__commands[name].parser.print_help()
                     res = True
                     error = ""
             else:
-                headers = ["Command", "Description"]
+                headers = [redcat.style.bold("Command"), redcat.style.bold("Description")]
                 data = []
                 for cmd in self.__commands.values():
-                    data.append([cmd.name, cmd.description])
+                    data.append([redcat.style.bold(redcat.style.green(cmd.name)), redcat.style.darkcyan(cmd.description)])
                 print("\n" + redcat.style.tabulate(headers, data)+ "\n")
                 res = True
                 error = ""
@@ -411,8 +428,12 @@ class Engine:
 
     def __on_log_message(self, msg: str) -> None:
         log = f"{redcat.style.bold('[' + str(datetime.datetime.utcnow())[:-3] + ']')} " + msg
-        with self.__lock_logs:
-            self.__logs.append(log)
+        if threading.current_thread() == threading.main_thread():
+            with self.__io_lock:
+                print("\r" + log, end="\n\r")
+        else:
+            with self.__lock_logs:
+                self.__logs.append(log)
 
     def __print_logs(self, logs: typing.List[str]) -> None:
         sys.stdout.write("\r\033[K")
@@ -438,7 +459,11 @@ class Engine:
         info = self.__manager.get_session_info()
         if not info:
             info = "None: @local"
-        prompt = f"{redcat.style.bold(redcat.style.yellow('['+ info + ']')) + ' ' + redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+        prompt = (
+            f"{redcat.style.bold(redcat.style.yellow('[' + info + ']'))}"
+            " "
+            f"{redcat.style.bold(redcat.style.green(self.__name))}🐈 "
+        )
         return prompt
 
     def run(self) -> None:
@@ -454,14 +479,16 @@ class Engine:
             try:
                 prompt = self.__get_prompt()
                 cmd = self.__input(prompt)
-                res, error = self.__call(cmd)
+                with self.__io_lock:
+                    res, error = self.__call(cmd)
                 if not res:
                     if not error:
                         error = "unspecified error"
                     self.__on_log_message(redcat.style.bold(redcat.style.red("[!] error: ")) + error)
             except EOFError:
                 if self.__manager.selected_id:
-                    self.__manager.remote_shell()
+                    with self.__io_lock:
+                        self.__manager.remote_shell()
                 else:
                     print()
             except KeyboardInterrupt:
@@ -477,4 +504,3 @@ class Engine:
 
     def __exit__(self, type, value, traceback):
         self.__manager.clear()
-

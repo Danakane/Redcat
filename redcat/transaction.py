@@ -2,6 +2,7 @@ import base64
 import os
 import typing
 
+import redcat.utils
 import redcat.platform
 
 
@@ -12,9 +13,9 @@ class Transaction:
         self.__platform: redcat.platform.Platform = pltf
         self.__handle_echo: bool = handle_echo
         self.__timeout: int = timeout
-        self.__start: bytes = base64.b64encode(os.urandom(16))
-        self.__end: bytes = base64.b64encode(os.urandom(16))
-        self.__control: bytes = base64.b64encode(os.urandom(16))
+        self.__start: bytes = base64.b64encode(os.urandom(8))
+        self.__end: bytes = base64.b64encode(os.urandom(8))
+        self.__control: bytes = base64.b64encode(os.urandom(8))
         self.__buffer: bytes = self.__platform.build_transaction(self.__payload, self.__start, self.__end, self.__control)
 
     def execute(self) -> typing.Tuple[bool, bool, bytes]:

@@ -24,28 +24,5 @@ class Transaction:
         if res and self.__control in data:
             cmd_success = True
             data = data.replace(self.__control, b"") # remove control code from the returned data
-        if self.__platform.platform_name == redcat.platform.WINDOWS:
-            # more cleaning for windows with pty...
-            # This problem may be caused by how the implant works
-            # Need to change the implant and test again
-            if self.__platform.has_pty:
-                # This fix is just too broken
-                # Find a better solution later 
-                escape_seq = redcat.utils.extract_data(data, b"\r\n\x1b[", b"H")
-                escape_seq = b"\r\n\x1b[" + escape_seq + b"H"
-                idx = data.find(escape_seq)
-                if idx > -1:
-                    start_idx = data[:idx].rfind(b"\x07")
-                    data = data[start_idx:]
-                    data = redcat.utils.extract_data(data, b"\x07", b"\r\x1b]0;")
-                    filtered_data = bytearray()
-                    i = 0
-                    while i < len(data):
-                        if data[i:i+len(escape_seq)] == escape_seq:
-                            i += len(escape_seq) + 1
-                        else:
-                            filtered_data.append(data[i])
-                            i += 1
-                    data = bytes(filtered_data)
         return res, cmd_success, data
 

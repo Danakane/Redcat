@@ -144,7 +144,7 @@ class Engine(metaclass=redcat.utils.Singleton):
             return res, error
         self.__commands[cmd_kill.name] = cmd_kill
         # upgrade command
-        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a pty using raindrop implant.")
+        cmd_upgrade = redcat.command.Command("upgrade", self, "upgrade a session with a C2 implant.")
         @cmd_upgrade.command(
             [
                 redcat.command.argument("id", type=str, nargs="?", default="", help=("id of session to upgrade. "
@@ -203,7 +203,7 @@ class Engine(metaclass=redcat.utils.Singleton):
             return res, error
         self.__commands[cmd_session.name] = cmd_session
         # remote shell command
-        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id, use the selected session id if the id is not provided")
+        cmd_shell = redcat.command.Command("shell", self, "spawn a remote shell for a given session id, use the selected session by default")
         @cmd_shell.command(
             [
                 redcat.command.argument("id", type=str, nargs="?", help="id of session to spawn"),
@@ -236,7 +236,7 @@ class Engine(metaclass=redcat.utils.Singleton):
         self.__commands[cmd_download.name] = cmd_download
         # upload commands
         cmd_upload = redcat.command.Command("upload", self, 
-            "upload a file to the remote host of a given session (slow: not recommended for files bigger than a few mb)",
+            "upload a file to the remote host of a given session",
             self.__on_upload_command_completion)
         @cmd_upload.command(
             [
@@ -296,7 +296,7 @@ class Engine(metaclass=redcat.utils.Singleton):
                 headers = [redcat.style.bold("Command"), redcat.style.bold("Description")]
                 data = []
                 for cmd in self.__commands.values():
-                    data.append([redcat.style.bold(redcat.style.green(cmd.name)), redcat.style.bold(redcat.style.yellow(cmd.description))])
+                    data.append([redcat.style.bold(redcat.style.green(cmd.name)), redcat.style.darkcyan(cmd.description)])
                 print("\n" + redcat.style.tabulate(headers, data)+ "\n")
                 res = True
                 error = ""

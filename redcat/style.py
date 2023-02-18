@@ -119,7 +119,7 @@ def tabulate(headers: typing.List[str], rows: typing.List[typing.List[str]]) -> 
     return table
 
 # https://stackoverflow.com/questions/3173320/text-progress-bar-in-terminal-with-block-characters?noredirect=1&lq=1
-def print_progress_bar (iteration, total, prefix = "", suffix = "", decimals = 1, length = 100, fill = "█", print_end = "\r"):
+def print_progress_bar (iteration, total, prefix = "", suffix = "", decimals = 1, length = 100, fill = "━", print_end = "\r"):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -141,8 +141,8 @@ def print_progress_bar (iteration, total, prefix = "", suffix = "", decimals = 1
         # iteration == total
         fill = green(fill)
     filled_length = int(length * iteration // total)
-    bar = fill * filled_length + "-" * (length - filled_length)
-    print(f"\r{prefix} |{bar}| {percent}% {suffix}", end = print_end)
+    bar = fill * filled_length + " " * (length - filled_length)
+    print(f"\r{prefix} {bar} {percent}% {suffix}", end = print_end)
     # Print New Line on Complete
     if iteration == total: 
         print()
